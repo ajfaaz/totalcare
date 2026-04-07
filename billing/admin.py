@@ -1,0 +1,64 @@
+from django.contrib import admin
+from .models import CustomUser, Patient
+from django.contrib.auth.admin import UserAdmin
+from .models import Service, Bill, BillItem, Payment
+from .models import Medicine
+from .models import ThirdPartyPayer, PatientCoverage
+
+
+class BillItemInline(admin.TabularInline):
+    model = BillItem
+    extra = 1
+
+class BillAdmin(admin.ModelAdmin):
+    inlines = [BillItemInline]
+    list_display = ['invoice_no', 'patient', 'total_amount', 'created_by', 'created_at']
+
+admin.site.register(Service)
+admin.site.register(Bill, BillAdmin)
+admin.site.register(Payment)
+admin.site.register(ThirdPartyPayer)
+admin.site.register(PatientCoverage)
+
+
+from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin
+from .models import CustomUser, Patient
+
+class CustomUserAdmin(UserAdmin):
+    model = CustomUser
+    list_display = ['username', 'email', 'role', 'hospital']
+    
+    # This controls the "Edit" page
+    fieldsets = UserAdmin.fieldsets + (
+        (None, {'fields': ('role', 'hospital')}),
+    )
+
+    # This controls the "Add User" page (where your error is happening)
+    add_fieldsets = UserAdmin.add_fieldsets + (
+        (None, {'fields': ('role', 'hospital')}),
+    )
+
+admin.site.register(CustomUser, CustomUserAdmin)
+admin.site.register(Patient)
+
+
+
+from .models import SLAPolicy
+
+@admin.register(SLAPolicy)
+class SLAPolicyAdmin(admin.ModelAdmin):
+    list_display = (
+        "hospital",
+        "severity",
+        "response_time_minutes",
+        "escalation_time_minutes",
+        "max_escalation_level",
+        "active",
+    )
+    list_filter = ("hospital", "severity", "active")
+    ordering = ("hospital", "severity")
+
+from .models import LabTestRequest
+
+admin.site.register(LabTestRequest)

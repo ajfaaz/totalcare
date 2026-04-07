@@ -1,0 +1,40 @@
+.hero-section {
+    height: 90vh;
+    background: linear-gradient(135deg, #0d6efd, #0a58ca);
+}
+
+.hero-section h1 {
+    font-size: 3rem;
+}
+
+.hero-section p {
+    max-width: 700px;
+    margin: auto;
+}
+
+.card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+}
+
+.sidebar {
+    background-color: #1f2937;   /* Dark executive navy */
+    min-height: 100vh;
+}
+
+.sidebar .nav-link {
+    color: #d1d5db;
+}
+
+.sidebar .nav-link:hover {
+    background-color: #374151;
+    color: #ffffff;
+}
+
+.sidebar small {
+    color: #9ca3af !important;
+}

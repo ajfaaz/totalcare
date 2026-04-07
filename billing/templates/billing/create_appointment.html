@@ -1,0 +1,52 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}New Appointment{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Schedule Appointment</h2>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="mb-3">
+            <label class="form-label">Patient</label>
+            <select name="patient" class="form-select" required>
+                <option value="">-- Select Patient --</option>
+                {% for patient in patients %}
+                    <option value="{{ patient.id }}"
+                            {% if preselected_patient_id and patient.id|stringformat:"s" == preselected_patient_id %}selected{% endif %}>
+                        {{ patient.full_name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Doctor</label>
+            <select name="doctor" class="form-select" required>
+                <option value="">-- Select Doctor --</option>
+                {% for doctor in doctors %}
+                    <option value="{{ doctor.id }}">{{ doctor.full_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Date</label>
+            <input type="date" name="date" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Time</label>
+            <input type="time" name="time" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Reason</label>
+            <textarea name="reason" class="form-control" rows="3"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Create Appointment</button>
+    </form>
+</div>
+{% endblock %}

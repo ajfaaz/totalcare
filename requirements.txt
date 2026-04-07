@@ -1,0 +1,12 @@
+Django==4.2.7
+channels==4.0.0
+daphne==4.0.0
+autobahn==24.4.2
+pillow
+whitenoise
+psycopg2-binary
+xhtml2pdf==0.2.11
+python-decouple
+python-dotenv
+dj-database-url
+Faker

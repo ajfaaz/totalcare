@@ -1,0 +1,100 @@
+{% extends "billing/base.html" %}
+{% load static %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <!-- Header -->
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <h4>Patients</h4>
+            <p class="text-muted">Search and manage patients in your hospital.</p>
+        </div>
+
+        <!-- Search -->
+        <div class="col-md-6">
+            <form method="GET" class="d-flex">
+                <input type="text" name="q" class="form-control me-2"
+                       placeholder="Search name or patient ID..."
+                       value="{{ request.GET.q }}">
+                <button class="btn btn-primary">Search</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Patient List -->
+    <div class="row">
+        <div class="col-12">
+
+            {% if patients %}
+
+                <div class="list-group shadow-sm">
+
+                    {% for patient in patients %}
+                    <div class="list-group-item">
+
+                        <div class="d-flex justify-content-between align-items-center">
+
+                            <!-- Patient Info -->
+                            <div>
+                                <h6 class="mb-1">
+                                    {{ patient.full_name }}
+
+                                    {% if patient.active_visit %}
+                                        <span class="badge bg-success ms-2">Active Visit</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary ms-2">No Active Visit</span>
+                                    {% endif %}
+                                </h6>
+
+                                <small class="text-muted">
+                                    DOB: {{ patient.date_of_birth }} |
+                                    Phone: {{ patient.phone_number }}
+                                </small>
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="btn-group">
+
+                                <a href="{% url 'patient_emr' patient.id %}"
+                                   class="btn btn-outline-primary btn-sm">
+                                   EMR
+                                </a>
+
+                                <a href="{% url 'add_doctor_note' patient.id %}"
+                                   class="btn btn-primary btn-sm">
+                                   Note
+                                </a>
+
+                                <a href="{% url 'add_prescription' patient.id %}"
+                                   class="btn btn-secondary btn-sm">
+                                   Rx
+                                </a>
+
+                                <a href="{% url 'add_vital_sign' patient.id %}"
+                                   class="btn btn-info btn-sm">
+                                   Vitals
+                                </a>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+                    {% endfor %}
+
+                </div>
+
+            {% else %}
+                <div class="text-center mt-5">
+                    <p class="text-muted">No patients found.</p>
+                </div>
+            {% endif %}
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

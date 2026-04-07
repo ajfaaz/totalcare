@@ -1,0 +1,222 @@
+{% extends "base_dashboard.html" %}
+{% load static %}
+
+{% block title %}Doctor Dashboard{% endblock %}
+
+{% block content %}
+
+<h3 class="fw-bold mb-4 text-primary">
+<i class="bi bi-person-heart me-2"></i> Doctor Dashboard
+</h3>
+
+<!-- KPI CARDS -->
+<div class="row g-3 mb-4">
+
+<div class="col-md-3">
+<div class="card shadow-sm h-100">
+<div class="card-body">
+<h6 class="text-muted">
+<i class="bi bi-people me-1"></i> My Patients
+</h6>
+<h3 class="fw-bold">{{ doctor_patient_count }}</h3>
+</div>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card shadow-sm h-100">
+<div class="card-body">
+<h6 class="text-muted">
+<i class="bi bi-calendar2-week me-1"></i> Visits (30 days)
+</h6>
+<h3 class="fw-bold text-primary">{{ visits_last_30 }}</h3>
+</div>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card shadow-sm h-100">
+<div class="card-body">
+<h6 class="text-muted">
+<i class="bi bi-journal-medical me-1"></i> Prescriptions
+</h6>
+<h3 class="fw-bold text-success">{{ prescriptions_issued }}</h3>
+</div>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card shadow-sm h-100">
+<div class="card-body">
+<h6 class="text-muted">
+<i class="bi bi-capsule me-1"></i> Dispensed
+</h6>
+<h3 class="fw-bold text-warning">{{ prescriptions_dispensed }}</h3>
+</div>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card shadow-sm h-100">
+<div class="card-body">
+<h6 class="text-muted">
+<i class="bi bi-check2-circle me-1"></i> Completion Rate
+</h6>
+<h3 class="fw-bold text-info">{{ completion_rate }}%</h3>
+</div>
+</div>
+</div>
+
+</div>
+
+
+<!-- QUICK ACTIONS -->
+<div class="row g-3 mb-4">
+
+<div class="col-md-4">
+<div class="card shadow-sm text-center">
+<div class="card-body">
+<i class="bi bi-people fs-3 text-primary"></i>
+<h6 class="mt-2">View Patients</h6>
+<a href="{% url 'patient_list' %}" class="btn btn-sm btn-outline-primary mt-2">
+Open
+</a>
+</div>
+</div>
+</div>
+
+<div class="col-md-4">
+<div class="card shadow-sm text-center">
+<div class="card-body">
+<i class="bi bi-envelope fs-3 text-success"></i>
+<h6 class="mt-2">Messages</h6>
+<a href="{% url 'inbox' %}" class="btn btn-sm btn-outline-success mt-2">
+Inbox
+</a>
+</div>
+</div>
+</div>
+
+<div class="col-md-4">
+<div class="card shadow-sm text-center">
+<div class="card-body">
+<i class="bi bi-exclamation-triangle fs-3 text-danger"></i>
+<h6 class="mt-2">Vital Alerts</h6>
+<a href="{% url 'doctor_alert_dashboard' %}" class="btn btn-sm btn-outline-danger mt-2">
+View Alerts
+</a>
+</div>
+</div>
+</div>
+
+</div>
+
+
+<!-- PATIENT TABLE -->
+<div class="card shadow-sm border-0">
+
+<div class="card-body">
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h5 class="fw-bold mb-0">Assigned Patients</h5>
+</div>
+
+{% if patients %}
+<div class="table-responsive">
+
+<table class="table align-middle table-hover">
+
+<thead class="table-light">
+<tr>
+<th>Patient</th>
+<th>Phone</th>
+<th class="text-end">Actions</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for p in patients %}
+<tr>
+
+<td>
+<div class="fw-semibold">{{ p.full_name }}</div>
+</td>
+
+<td>{{ p.phone_number }}</td>
+
+<td class="text-end">
+
+<a href="{% url 'patient_emr' p.id %}" 
+class="btn btn-sm btn-outline-primary me-2">
+<i class="bi bi-file-medical"></i>
+</a>
+
+<a href="{% url 'add_prescription' p.id %}" 
+class="btn btn-sm btn-outline-success">
+<i class="bi bi-prescription"></i>
+</a>
+
+</td>
+
+</tr>
+{% endfor %}
+
+</tbody>
+</table>
+
+</div>
+
+{% else %}
+
+<div class="alert alert-light border text-center">
+<i class="bi bi-info-circle me-1"></i>
+No patients assigned yet.
+</div>
+
+{% endif %}
+
+</div>
+</div>
+
+<h4>Patient Queue</h4>
+
+<table class="table table-bordered">
+<tr>
+<th>#</th>
+<th>Patient</th>
+<th>Status</th>
+<th>Priority</th>
+<th>Action</th>
+</tr>
+
+{% for visit in queue %}
+
+<tr>
+
+<td>{{ forloop.counter }}</td>
+
+<td>{{ visit.patient.full_name }}</td>
+
+<td>{{ visit.status }}</td>
+
+<td>
+    {% if visit.is_emergency %}
+        <span class="badge bg-danger">Emergency</span>
+    {% else %}
+        <span class="badge bg-secondary">Normal</span>
+    {% endif %}
+</td>
+
+<td>
+<a href="{% url 'patient_emr' visit.patient.id %}" class="btn btn-sm btn-primary">
+Open
+</a>
+</td>
+
+</tr>
+
+{% endfor %}
+</table>
+
+{% endblock %}

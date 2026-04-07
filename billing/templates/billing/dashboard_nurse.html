@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container-fluid mt-4">
+  <h2 class="mb-4">👩‍⚕️ Nurse Dashboard</h2>
+
+  <!-- Quick Actions -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <a href="{% url 'patient_list' %}" class="card shadow-sm text-decoration-none">
+        <div class="card-body text-center">
+          <h5>Record Vitals</h5>
+          <p class="text-muted">Add new vital signs</p>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-3">
+      <a href="{% url 'patient_list' %}" class="card shadow-sm text-decoration-none">
+        <div class="card-body text-center">
+          <h5>All Patients</h5>
+          <p class="text-muted">Search / view</p>
+        </div>
+      </a>
+    </div>
+    <div class="col-md-3">
+      <a href="{% url 'inbox' %}" class="card shadow-sm text-decoration-none">
+        <div class="card-body text-center">
+          <h5>Messages</h5>
+          <p class="text-muted">Inbox ({{ unread_count }})</p>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Active Patients -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">Active Patient Visits</h5>
+    </div>
+    <div class="card-body">
+      {% if active_visits %}
+        <div class="table-responsive">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>Patient</th>
+                <th>Reason</th>
+                <th>Doctor</th>
+                <th>Time In</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for v in active_visits %}
+                <tr>
+                  <td>{{ v.patient.full_name }}</td>
+                  <td>{{ v.reason|default:"-" }}</td>
+                  <td>{{ v.assigned_doctor.get_full_name|default:v.assigned_doctor.username }}</td>
+                  <td>{{ v.started_at|date:"M d, H:i" }}</td>
+                  <td>
+                    <a href="{% url 'add_vital_sign' v.patient.id %}" class="btn btn-sm btn-outline-primary">
+                      Record Vitals
+                    </a>
+                    <a href="{% url 'patient_emr' v.patient.id %}" class="btn btn-sm btn-outline-secondary">
+                      View EMR
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-muted">No active patient visits.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Recent Vitals -->
+  <div class="card shadow-sm">
+    <div class="card-header bg-success text-white">
+      <h5 class="mb-0">Recent Vital Signs</h5>
+    </div>
+    <div class="card-body">
+      {% if recent_vitals %}
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Patient</th>
+                <th>BP</th>
+                <th>Pulse</th>
+                <th>Temp</th>
+                <th>SpO₂</th>
+                <th>Recorded At</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for v in recent_vitals %}
+                <tr>
+                  <td>{{ v.patient.full_name }}</td>
+                  <td>{{ v.blood_pressure_systolic|default:"-" }}/{{ v.blood_pressure_diastolic|default:"-" }}</td>
+                  <td>{{ v.heart_rate|default:"-" }}</td>
+                  <td>{{ v.temperature|default:"-" }}°C</td>
+                  <td>{{ v.spo2|default:"-" }}%</td>
+                  <td>{{ v.created_at|date:"M d, H:i" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-muted">No vitals recorded recently.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}

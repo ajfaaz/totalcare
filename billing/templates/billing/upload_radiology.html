@@ -1,0 +1,29 @@
+{% extends "billing/base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+
+    <h4>Upload Radiology Result</h4>
+
+    <p><strong>Patient:</strong> {{ radiology.visit.patient.full_name }}</p>
+    <p><strong>Scan Type:</strong> {{ radiology.imaging_type }}</p>
+
+    <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div class="mb-3">
+            <label>Findings</label>
+            <textarea name="findings" class="form-control" required></textarea>
+        </div>
+
+        <div class="mb-3">
+            <label>Upload Scan Image</label>
+            <input type="file" name="scan_image" class="form-control">
+        </div>
+
+        <button class="btn btn-success">Submit Report</button>
+
+    </form>
+
+</div>
+{% endblock %}

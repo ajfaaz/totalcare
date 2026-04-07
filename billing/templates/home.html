@@ -1,0 +1,189 @@
+{% extends 'billing/base_public.html' %}
+{% load static %}
+{% block content %}
+
+<section class="hero-section text-center text-white d-flex align-items-center">
+    <div class="container">
+        <h1 class="display-4 fw-bold">
+            Smart Digital Hospital System
+        </h1>
+        <p class="lead mt-3">
+            Transform your hospital operations with intelligent patient management,
+            automated billing, and real-time reporting — all in one secure platform.
+        </p>
+        <div class="mt-4">
+            <a href="{% url 'login' %}" class="btn btn-light btn-lg me-3">
+                Login
+            </a>
+            <a href="#" class="btn btn-outline-light btn-lg">
+                Request Demo
+            </a>
+        </div>
+    </div>
+</section>
+
+
+<section class="py-5 bg-light">
+    <div class="container text-center">
+        <h2 class="mb-5 fw-bold">Core Features</h2>
+        <div class="row">
+
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm p-4 h-100">
+                    <h5 class="fw-bold">Patient Records</h5>
+                    <p>Digitally manage patient information and visit history securely.</p>
+                </div>
+            </div>
+
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm p-4 h-100">
+                    <h5 class="fw-bold">Appointments</h5>
+                    <p>Schedule and manage doctor appointments efficiently.</p>
+                </div>
+            </div>
+
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm p-4 h-100">
+                    <h5 class="fw-bold">Billing & Reports</h5>
+                    <p>Generate invoices and track hospital revenue easily.</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+
+<section class="py-5">
+    <div class="container">
+        <div class="row align-items-center">
+
+            <div class="col-md-6">
+                <h2 class="fw-bold mb-4">Simple. Powerful. Reliable.</h2>
+                <p>
+                    TotalCare is designed for private clinics and hospitals
+                    that need a reliable system without expensive complexity.
+                </p>
+                <p>
+                    From patient registration to billing and reports,
+                    everything is streamlined into one easy-to-use dashboard.
+                </p>
+            </div>
+
+            <div class="col-md-6 text-center">
+                <img src="{% static 'images/dashboard-preview.png' %}" 
+                     class="img-fluid shadow rounded" 
+                     alt="Dashboard Preview">
+            </div>
+
+        </div>
+    </div>
+</section>
+
+
+<section class="py-5 bg-light">
+    <div class="container text-center">
+        <h2 class="fw-bold mb-5">Why TotalCare is Different</h2>
+
+        <div class="row">
+
+            <div class="col-md-4 mb-4">
+                <h5 class="fw-bold">Real-Time Insights</h5>
+                <p>Instant statistics and reports to support smart decision-making.</p>
+            </div>
+
+            <div class="col-md-4 mb-4">
+                <h5 class="fw-bold">Role-Based Intelligence</h5>
+                <p>Doctors, receptionists, and accountants see only what they need.</p>
+            </div>
+
+            <div class="col-md-4 mb-4">
+                <h5 class="fw-bold">Operational Automation</h5>
+                <p>Reduce paperwork and manual errors with automated workflows.</p>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<section style="padding: 60px 0;">
+    <div class="container">
+        <div class="row text-center">
+
+            <div class="col-md-4">
+                <h4>Patient Management</h4>
+                <p>Register patients, manage records, and track visits easily.</p>
+            </div>
+
+            <div class="col-md-4">
+                <h4>Appointment Scheduling</h4>
+                <p>Book and manage appointments with doctors efficiently.</p>
+            </div>
+
+            <div class="col-md-4">
+                <h4>Billing & Reports</h4>
+                <p>Generate invoices, track payments and export reports.</p>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+
+<section style="background: #f8f9fa; padding: 60px 0; text-align:center;">
+    <h3>Designed for Private Clinics & Growing Hospitals</h3>
+    <p style="margin-top:15px;">
+        TotalCare simplifies hospital operations so healthcare professionals
+        can focus on what matters most — patient care.
+    </p>
+</section>
+
+
+<section class="py-5">
+    <div class="container text-center">
+        <h2 class="fw-bold mb-5">Flexible Deployment Model</h2>
+
+        <div class="row">
+
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm p-4 h-100">
+                    <h5 class="fw-bold">Initial Setup & Migration</h5>
+                    <p>
+                        We handle data migration, service configuration,
+                        and staff onboarding to ensure smooth transition
+                        to digital operations.
+                    </p>
+                </div>
+            </div>
+
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm p-4 h-100">
+                    <h5 class="fw-bold">Monthly Subscription</h5>
+                    <p>
+                        Affordable monthly plan covering system access,
+                        hosting, maintenance, and continuous improvements.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+
+<section class="py-5 text-center text-white" style="background:#0d6efd;">
+    <div class="container">
+        <h2 class="fw-bold">Ready to Digitize Your Hospital?</h2>
+        <p class="mt-3">Start managing your hospital operations smarter today.</p>
+        <a href="{% url 'login' %}" class="btn btn-light btn-lg mt-3">
+            Get Started
+        </a>
+    </div>
+</section>
+
+
+<footer style="background: #212529; color: white; padding: 40px 0; text-align:center;">
+    <p>&copy; 2026 TotalCare HMS. Developed by ArewaNet Ventures.</p>
+</footer>
+
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base_dashboard.html" %}
+
+{% block content %}
+
+<h4 class="mb-4">Add Lab Result</h4>
+
+<div class="card shadow-sm">
+
+<div class="card-body">
+
+<form method="POST">
+
+{% csrf_token %}
+
+<div class="mb-3">
+
+<label class="form-label">Test</label>
+
+<input type="text" class="form-control"
+value="{{ test.test_type }}" disabled>
+
+</div>
+
+<div class="mb-3">
+
+<label class="form-label">Result</label>
+
+<textarea name="result"
+class="form-control"
+rows="5"
+required></textarea>
+
+</div>
+
+<button class="btn btn-success">
+
+Save Result
+
+</button>
+
+</form>
+
+</div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Lab Dashboard{% endblock %}
+
+{% block content %}
+
+<h3 class="fw-bold mb-4 text-primary">
+<i class="bi bi-flask"></i> Laboratory Dashboard
+</h3>
+
+<!-- KPI CARDS -->
+
+<div class="row mb-4">
+
+<div class="col-md-3">
+<div class="card shadow-sm">
+<div class="card-body">
+<h6 class="text-muted">Pending Tests</h6>
+<h3 class="text-warning">{{ pending_count }}</h3>
+</div>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card shadow-sm">
+<div class="card-body">
+<h6 class="text-muted">Completed Today</h6>
+<h3 class="text-success">{{ completed_today }}</h3>
+</div>
+</div>
+</div>
+
+</div>
+
+
+<!-- TEST QUEUE -->
+
+<div class="card shadow-sm">
+
+<div class="card-body">
+
+<h5 class="mb-3">Lab Test Queue</h5>
+
+<table class="table table-hover align-middle">
+
+<thead class="table-light">
+<tr>
+<th>Patient</th>
+<th>Doctor</th>
+<th>Test</th>
+<th>Status</th>
+<th>Action</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for test in pending_tests %}
+
+<tr>
+
+<td>{{ test.visit.patient.full_name }}</td>
+
+<td>{{ test.doctor.full_name }}</td>
+
+<td>{{ test.test_type }}</td>
+
+<td>
+<span class="badge bg-warning">Requested</span>
+</td>
+
+<td>
+
+<a href="{% url 'complete_lab_test' test.id %}"
+class="btn btn-sm btn-success">
+Add Result
+</a>
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+</div>
+
+{% endblock %}

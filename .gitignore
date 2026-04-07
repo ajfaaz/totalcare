@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+
+# Django
+db.sqlite3
+/media/
+/staticfiles/
+
+# Env
+.env
+venv/
+
+# cPanel junk
+.passenger_wsgi.py

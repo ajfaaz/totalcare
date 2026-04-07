@@ -1,0 +1,51 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Create Bill{% endblock %}
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4">
+    <h3>Create Bill for {{ patient.full_name }}</h3>
+
+    <!-- Coverage Info -->
+    {% if coverage %}
+    <div class="alert alert-info">
+        <strong>Coverage:</strong> {{ coverage.payer.name }} <br>
+        Patient: {{ coverage.patient_percentage }}% |
+        Government: {{ coverage.government_percentage }}%
+    </div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Service</th>
+                    <th>Price</th>
+                    <th>Quantity</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for service in services %}
+                <tr>
+                    <td>
+                        <input type="checkbox" name="service" value="{{ service.id }}">
+                        {{ service.name }}
+                    </td>
+                    <td>₦{{ service.price }}</td>
+                    <td>
+                        <input type="number" name="quantity" min="1" value="1" class="form-control">
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <button type="submit" class="btn btn-primary">
+            Generate Invoice
+        </button>
+    </form>
+</div>
+
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block sidebar %}
+
+<a class="nav-link text-white" href="{% url 'admin_dashboard' %}">
+<i class="bi bi-speedometer2 me-2"></i> Dashboard
+</a>
+
+<hr class="text-secondary">
+
+<h6 class="text-light px-3">Communication</h6>
+
+<a class="nav-link text-white" href="{% url 'inbox' %}">
+<i class="bi bi-envelope me-2"></i> Inbox
+{% if unread_count > 0 %}
+<span class="badge bg-danger ms-1">{{ unread_count }}</span>
+{% endif %}
+</a>
+
+<a class="nav-link text-white" href="{% url 'sent_messages' %}">
+<i class="bi bi-send me-2"></i> Sent Messages
+</a>
+
+<a class="nav-link text-white" href="{% url 'compose_message' %}">
+<i class="bi bi-pencil-square me-2"></i> Compose
+</a>
+
+<hr class="text-secondary">
+
+<h6 class="text-light px-3">SLA Monitoring</h6>
+
+<a class="nav-link text-white" href="{% url 'sla_settings' %}">
+<i class="bi bi-gear me-2"></i> SLA Policies
+</a>
+
+<a class="nav-link text-white" href="{% url 'doctor_sla_dashboard' %}">
+<i class="bi bi-person-badge me-2"></i> Doctor Scorecards
+</a>
+
+<a class="nav-link text-white" href="{% url 'department_sla_dashboard' %}">
+<i class="bi bi-diagram-3 me-2"></i> Department Analytics
+</a>
+
+<a class="nav-link text-white" href="{% url 'doctor_sla_trend' %}">
+<i class="bi bi-graph-up me-2"></i> Performance Trends
+</a>
+
+{% endblock %}
+
+
+{% block content %}
+
+<h2 class="fw-bold mb-3">Hospital Executive Dashboard</h2>
+
+<p class="text-muted">
+Welcome <strong>{{ user.username }}</strong>. Overview of financial performance and clinical operations.
+</p>
+
+<div class="row mt-4">
+
+<div class="col-md-3 mb-3">
+<div class="card shadow-sm text-center">
+<div class="card-body">
+<h6 class="text-muted">Total Income</h6>
+<h3 class="text-success">₦{{ total_income|floatformat:2 }}</h3>
+</div>
+</div>
+</div>
+
+<div class="col-md-3 mb-3">
+<div class="card shadow-sm text-center">
+<div class="card-body">
+<h6 class="text-muted">Income (30 Days)</h6>
+<h3 class="text-primary">₦{{ monthly_income|floatformat:2 }}</h3>
+</div>
+</div>
+</div>
+
+<div class="col-md-3 mb-3">
+<div class="card shadow-sm text-center">
+<div class="card-body">
+<h6 class="text-muted">Total Patients</h6>
+<h3>{{ patient_count }}</h3>
+</div>
+</div>
+</div>
+
+<div class="col-md-3 mb-3">
+<div class="card shadow-sm text-center">
+<div class="card-body">
+<h6 class="text-muted">Appointments</h6>
+<h3>{{ appointment_count }}</h3>
+</div>
+</div>
+</div>
+
+</div>
+
+
+<div class="row mt-4">
+
+<div class="col-md-3 mb-3">
+<div class="card border-primary shadow-sm text-center">
+<div class="card-body">
+<h6>Total Alerts</h6>
+<h3>{{ total_alerts|default:"—" }}</h3>
+</div>
+</div>
+</div>
+
+<div class="col-md-3 mb-3">
+<div class="card border-danger shadow-sm text-center">
+<div class="card-body">
+<h6>Critical Open</h6>
+<h3 class="text-danger">{{ critical_open|default:"—" }}</h3>
+</div>
+</div>
+</div>
+
+<div class="col-md-3 mb-3">
+<div class="card border-success shadow-sm text-center">
+<div class="card-body">
+<h6>SLA Compliance</h6>
+<h3 class="text-success">{{ sla_compliance|default:"—" }}%</h3>
+</div>
+</div>
+</div>
+
+<div class="col-md-3 mb-3">
+<div class="card border-warning shadow-sm text-center">
+<div class="card-body">
+<h6>Escalations</h6>
+<h3 class="text-warning">{{ escalations|default:"—" }}</h3>
+</div>
+</div>
+</div>
+
+</div>
+
+{% endblock %}

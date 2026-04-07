@@ -1,0 +1,29 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Super Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2">Super Admin Dashboard</h1>
+    </div>
+
+    <p>Platform-wide overview and management.</p>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">Hospitals on Platform ({{ hospitals.count }})</h5>
+        </div>
+        <div class="list-group list-group-flush">
+            {% for hospital in hospitals %}
+                <a href="{% url 'hospital_login' slug=hospital.slug %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    {{ hospital.name }}
+                    <span class="badge bg-primary rounded-pill">View Login</span>
+                </a>
+            {% empty %}
+                <li class="list-group-item">No hospitals found.</li>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

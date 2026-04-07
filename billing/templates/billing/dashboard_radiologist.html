@@ -1,0 +1,96 @@
+{% extends "billing/base_dashboard.html" %}
+{% block content %}
+
+<div class="container-fluid mt-4">
+
+    <h3 class="fw-bold text-primary mb-4">
+        <i class="bi bi-camera"></i> Radiology Dashboard
+    </h3>
+
+    <!-- KPI -->
+    <div class="row mb-4">
+
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h6>Total Scans</h6>
+                    <h3>{{ total_scans }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h6>Pending</h6>
+                    <h3 class="text-warning">{{ pending_reports }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h6>Completed Today</h6>
+                    <h3 class="text-success">{{ completed_today }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h6>Messages</h6>
+                    <h3 class="text-info">{{ unread_count }}</h3>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Pending Table -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <h5 class="fw-bold mb-3">Pending Radiology Requests</h5>
+
+            {% if pending_scans %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Patient</th>
+                        <th>Test</th>
+                        <th>Doctor</th>
+                        <th>Date</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for scan in pending_scans %}
+                    <tr>
+                        <td>{{ scan.visit.patient.full_name }}</td>
+                        <td>{{ scan.imaging_type }}</td>
+                        <td>{{ scan.doctor.full_name }}</td>
+                        <td>{{ scan.requested_at|date:"M d, H:i" }}</td>
+                        <td class="text-end">
+
+                            <a href="{% url 'patient_emr' scan.visit.patient.id %}" 
+                               class="btn btn-sm btn-outline-primary">
+                                View
+                            </a>
+
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+                <p class="text-muted">No pending scans.</p>
+            {% endif %}
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
