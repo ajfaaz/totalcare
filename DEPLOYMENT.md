@@ -114,6 +114,18 @@ It will:
 5. run `collectstatic`
 6. restart Passenger
 
+This repo also includes `healthcheck.sh`.
+
+Run:
+
+`bash /home/jvlbvywb/repositories/totalcare/healthcheck.sh`
+
+It will:
+
+1. run `python manage.py check`
+2. confirm key Passenger/Django files exist
+3. confirm `staticfiles` exists
+
 ## Safe release checklist
 
 For each release:
