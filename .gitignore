@@ -10,6 +10,11 @@ db.sqlite3
 # Env
 .env
 venv/
+.venv/
+env/
 
 # cPanel junk
 .passenger_wsgi.py
+
+# Logs
+*.log

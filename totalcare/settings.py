@@ -2,29 +2,56 @@ import os
 from pathlib import Path
 from decouple import config
 from dotenv import load_dotenv
+import dj_database_url
 
 # Load environment variables for local development
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 # BASE DIRECTORY
-BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def env_bool(name, default=False):
+    value = config(name, default=default)
+    if isinstance(value, bool):
+        return value
+
+    normalized = str(value).strip().lower()
+    if normalized in {'1', 'true', 'yes', 'on'}:
+        return True
+    if normalized in {'0', 'false', 'no', 'off', 'release', 'prod', 'production'}:
+        return False
+    return bool(default)
 
 # =====================
 # SECURITY SETTINGS
 # =====================
 SECRET_KEY = config('SECRET_KEY', default='your-dev-secret-key')
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = env_bool('DEBUG', default=True)
 
-# Add all allowed domains
-ALLOWED_HOSTS = [
-    "totalcare.arewanetventures.com",
-    ".totalcare.arewanetventures.com",  # Accepts all subdomains
+DEFAULT_ALLOWED_HOSTS = [
+    '127.0.0.1',
+    'localhost',
+    'totalcare.arewanetventures.com',
+    '.totalcare.arewanetventures.com',
 ]
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default=','.join(DEFAULT_ALLOWED_HOSTS),
+    cast=lambda value: [host.strip() for host in value.split(',') if host.strip()],
+)
 
-CSRF_TRUSTED_ORIGINS = [
-    "https://*.totalcare.arewanetventures.com",
-    "http://*.totalcare.arewanetventures.com",  # Add this for HTTP testing
+DEFAULT_CSRF_TRUSTED_ORIGINS = [
+    'http://127.0.0.1',
+    'http://localhost',
+    'https://*.totalcare.arewanetventures.com',
+    'http://*.totalcare.arewanetventures.com',
 ]
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default=','.join(DEFAULT_CSRF_TRUSTED_ORIGINS),
+    cast=lambda value: [origin.strip() for origin in value.split(',') if origin.strip()],
+)
 
 # =====================
 # APPLICATIONS
@@ -97,16 +124,30 @@ TEMPLATES = [
 # =====================
 # DATABASE
 # =====================
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'jvlbvywb_totalcare_db',
-        'USER': 'jvlbvywb_Totalcare',
-        'PASSWORD': '-8v2a;=pWsaaTT*u',
-        'HOST': '127.0.0.1',
-        'PORT': '5432',
+database_url = config('DATABASE_URL', default='')
+
+if database_url:
+    DATABASES = {
+        'default': dj_database_url.parse(database_url, conn_max_age=600),
     }
-}
+elif config('DB_ENGINE', default='sqlite').lower() == 'postgres':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME'),
+            'USER': config('DB_USER'),
+            'PASSWORD': config('DB_PASSWORD'),
+            'HOST': config('DB_HOST', default='127.0.0.1'),
+            'PORT': config('DB_PORT', default='5432'),
+        }
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 # =====================
 # PASSWORD VALIDATION
@@ -175,18 +216,9 @@ VITAL_ALERT_ESCALATION_RULES = {
     2: {"minutes": 20, "role": "admin"},
 }
 
-# =====================
-# CSR Trust
-# =====================
-CSRF_TRUSTED_ORIGINS = [
-    "https://*.totalcare.arewanetventures.com",
-    "http://*.totalcare.arewanetventures.com",
-]
-
-
-# Allow cookies across all subdomains
-SESSION_COOKIE_DOMAIN = ".totalcare.arewanetventures.com"
-CSRF_COOKIE_DOMAIN = ".totalcare.arewanetventures.com"
+# Allow cookies across all subdomains in production when explicitly set
+SESSION_COOKIE_DOMAIN = config('SESSION_COOKIE_DOMAIN', default=None)
+CSRF_COOKIE_DOMAIN = config('CSRF_COOKIE_DOMAIN', default=None)
 
 # Only enable secure cookies in production (HTTPS)
 if not DEBUG:
