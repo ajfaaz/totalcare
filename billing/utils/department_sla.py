@@ -19,7 +19,7 @@ def department_sla_metrics(hospital):
         dept_doctors = doctors.filter(specialty=dept)
 
         alerts = VitalAlert.objects.filter(
-            assigned_doctor__in=dept_doctors,
+            doctor__in=dept_doctors,
             patient__hospital=hospital
         )
 

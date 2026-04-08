@@ -1,5 +1,5 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import UserCreationForm, SetPasswordForm
 from django.contrib.auth import get_user_model
 from django.forms.widgets import DateInput, TimeInput, Textarea, Select
 from .models import (
@@ -67,6 +67,14 @@ class PatientRegistrationForm(forms.ModelForm):
 User = get_user_model()
 
 class CustomUserCreationForm(UserCreationForm):
+    first_name = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "First name"})
+    )
+    last_name = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Last name"})
+    )
     email = forms.EmailField(required=True)
     role = forms.ChoiceField(
         choices=User.USER_ROLE_CHOICES,
@@ -76,22 +84,71 @@ class CustomUserCreationForm(UserCreationForm):
 
     class Meta:
         model = User
-        fields = ("username", "email", "role", "specialty", "password1", "password2")
+        fields = (
+            "first_name",
+            "last_name",
+            "username",
+            "email",
+            "role",
+            "specialty",
+            "password1",
+            "password2",
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["role"].help_text = "Choose the staff member's access level."
+        self.fields["specialty"].help_text = "Optional. Use for doctors or other specialist roles."
+
+        for field_name in ("username", "email", "specialty", "password1", "password2"):
+            self.fields[field_name].widget.attrs.update({"class": "form-control"})
+        self.fields["username"].widget.attrs.setdefault("placeholder", "Username")
+        self.fields["email"].widget.attrs.setdefault("placeholder", "Email address")
+        self.fields["specialty"].widget.attrs.setdefault("placeholder", "e.g. Cardiology")
+        self.fields["password1"].widget.attrs.setdefault("placeholder", "Password")
+        self.fields["password2"].widget.attrs.setdefault("placeholder", "Confirm password")
 
     def save(self, commit=True, hospital=None):
         user = super().save(commit=False)
+        user.first_name = self.cleaned_data["first_name"]
+        user.last_name = self.cleaned_data["last_name"]
         user.email = self.cleaned_data["email"]
         user.role = self.cleaned_data["role"]
-        # Set hospital - use provided or get/create default
-        if hospital:
-            user.hospital = hospital
-        else:
-            from .models import Hospital
-            hospital, _ = Hospital.objects.get_or_create(name="Main Hospital")
-            user.hospital = hospital
+        if not hospital:
+            raise ValueError("A hospital must be provided when creating a user.")
+        user.hospital = hospital
         if commit:
             user.save()
         return user
+
+
+class StaffUserUpdateForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ("first_name", "last_name", "username", "email", "role", "specialty", "is_active")
+        widgets = {
+            "first_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "First name"}),
+            "last_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Last name"}),
+            "username": forms.TextInput(attrs={"class": "form-control", "placeholder": "Username"}),
+            "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "Email address"}),
+            "role": forms.Select(attrs={"class": "form-control"}),
+            "specialty": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. Cardiology"}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["role"].help_text = "Update the staff member's access level."
+        self.fields["specialty"].help_text = "Optional. Useful for doctors and specialist roles."
+
+
+class StaffPasswordResetForm(SetPasswordForm):
+    def __init__(self, user, *args, **kwargs):
+        super().__init__(user, *args, **kwargs)
+        for field_name in ("new_password1", "new_password2"):
+            self.fields[field_name].widget.attrs.update({"class": "form-control"})
+        self.fields["new_password1"].widget.attrs.setdefault("placeholder", "New password")
+        self.fields["new_password2"].widget.attrs.setdefault("placeholder", "Confirm new password")
 
 
 # ----------------- BILLING -----------------
@@ -129,19 +186,6 @@ class AppointmentForm(forms.ModelForm):
         if commit:
             appointment.save()
         return appointment
-
-
-        # Group recipients by role
-        roles = CustomUser.objects.values_list('role', flat=True).distinct()
-        grouped_choices = []
-        for role in roles:
-            users = CustomUser.objects.filter(role=role)
-            choices = [(u.id, f"{u.username}") for u in users]
-            grouped_choices.append((role.capitalize(), choices))
-
-        self.fields['recipient'].choices = grouped_choices
-        self.fields['subject'].widget.attrs.update({'class': 'form-control'})
-        self.fields['body'].widget.attrs.update({'class': 'form-control', 'rows': 5})
 
 
 # ----------------- MEDICAL RECORD -----------------

@@ -79,12 +79,18 @@
     
     <div class="ms-auto">
       {% if user.is_authenticated %}
-        <span class="text-white me-3">
-          {{ user.username }}
-        </span>
-        <a href="{% url 'logout' %}" class="btn btn-outline-light btn-sm">
-          Logout
-        </a>
+        <div class="d-flex align-items-center gap-3">
+          <div class="text-end text-white small">
+            <div class="fw-semibold">{{ user.full_name }}</div>
+            <div class="opacity-75">{{ user.get_role_display }}{% if user.hospital %} • {{ user.hospital.name }}{% endif %}</div>
+          </div>
+          <form method="post" action="{% url 'logout' %}" class="m-0">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-light btn-sm">
+              Logout
+            </button>
+          </form>
+        </div>
       {% endif %}
     </div>
   </div>

@@ -4,89 +4,84 @@
 
 {% block content %}
 
-<h3 class="fw-bold mb-4 text-primary">
-<i class="bi bi-flask"></i> Laboratory Dashboard
-</h3>
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+  <div>
+    <h2 class="fw-bold text-primary mb-1">
+      <i class="bi bi-flask me-2"></i>Laboratory Dashboard
+    </h2>
+    <p class="text-muted mb-0">Track requested tests and keep turnaround times moving.</p>
+  </div>
+</div>
 
-<!-- KPI CARDS -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Pending Tests</h6>
+        <div class="fs-3 fw-bold text-warning">{{ pending_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Completed Today</h6>
+        <div class="fs-3 fw-bold text-success">{{ completed_today }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Open Queue</h6>
+        <div class="fs-3 fw-bold text-primary">{{ pending_tests|length }}</div>
+      </div>
+    </div>
+  </div>
+</div>
 
-<div class="row mb-4">
-
-<div class="col-md-3">
 <div class="card shadow-sm">
-<div class="card-body">
-<h6 class="text-muted">Pending Tests</h6>
-<h3 class="text-warning">{{ pending_count }}</h3>
-</div>
-</div>
-</div>
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="fw-bold mb-0">Lab Test Queue</h5>
+      <span class="badge bg-secondary">{{ pending_tests|length }} awaiting results</span>
+    </div>
 
-<div class="col-md-3">
-<div class="card shadow-sm">
-<div class="card-body">
-<h6 class="text-muted">Completed Today</h6>
-<h3 class="text-success">{{ completed_today }}</h3>
-</div>
-</div>
-</div>
-
-</div>
-
-
-<!-- TEST QUEUE -->
-
-<div class="card shadow-sm">
-
-<div class="card-body">
-
-<h5 class="mb-3">Lab Test Queue</h5>
-
-<table class="table table-hover align-middle">
-
-<thead class="table-light">
-<tr>
-<th>Patient</th>
-<th>Doctor</th>
-<th>Test</th>
-<th>Status</th>
-<th>Action</th>
-</tr>
-</thead>
-
-<tbody>
-
-{% for test in pending_tests %}
-
-<tr>
-
-<td>{{ test.visit.patient.full_name }}</td>
-
-<td>{{ test.doctor.full_name }}</td>
-
-<td>{{ test.test_type }}</td>
-
-<td>
-<span class="badge bg-warning">Requested</span>
-</td>
-
-<td>
-
-<a href="{% url 'complete_lab_test' test.id %}"
-class="btn btn-sm btn-success">
-Add Result
-</a>
-
-</td>
-
-</tr>
-
-{% endfor %}
-
-</tbody>
-
-</table>
-
-</div>
+    {% if pending_tests %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Patient</th>
+              <th>Doctor</th>
+              <th>Test</th>
+              <th>Status</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for test in pending_tests %}
+              <tr>
+                <td>{{ test.visit.patient.full_name }}</td>
+                <td>{{ test.doctor.full_name|default:"Unassigned" }}</td>
+                <td>{{ test.test_type }}</td>
+                <td><span class="badge bg-warning text-dark">Requested</span></td>
+                <td class="text-end">
+                  <a href="{% url 'complete_lab_test' test.id %}" class="btn btn-sm btn-success">
+                    Add Result
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light border mb-0">
+        No pending lab tests right now.
+      </div>
+    {% endif %}
+  </div>
 </div>
 
 {% endblock %}

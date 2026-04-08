@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block sidebar %}
+
+<a class="nav-link text-white" href="{% url 'admin_dashboard' %}">
+<i class="bi bi-speedometer2 me-2"></i> Dashboard
+</a>
+
+<a class="nav-link text-white" href="{% url 'register' %}">
+<i class="bi bi-person-plus me-2"></i> Create Staff User
+</a>
+
+<hr class="text-secondary">
+
+<h6 class="text-light px-3">Communication</h6>
+
+<a class="nav-link text-white" href="{% url 'inbox' %}">
+<i class="bi bi-envelope me-2"></i> Inbox
+</a>
+
+<a class="nav-link text-white" href="{% url 'sent_messages' %}">
+<i class="bi bi-send me-2"></i> Sent Messages
+</a>
+
+<a class="nav-link text-white" href="{% url 'compose_message' %}">
+<i class="bi bi-pencil-square me-2"></i> Compose
+</a>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+<div>
+<h2 class="fw-bold mb-1">Manage Staff User</h2>
+<p class="text-muted mb-0">Update account details and reset passwords for <strong>{{ staff_user.username }}</strong>.</p>
+</div>
+<a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+</div>
+
+<div class="row g-4">
+<div class="col-lg-7">
+<div class="card shadow-sm">
+<div class="card-body">
+<h4 class="fw-semibold mb-3">Profile & Access</h4>
+<form method="post" novalidate>
+{% csrf_token %}
+
+{% if profile_form.non_field_errors %}
+<div class="alert alert-danger">
+{{ profile_form.non_field_errors }}
+</div>
+{% endif %}
+
+<div class="row g-3">
+<div class="col-md-6">
+<label class="form-label" for="{{ profile_form.first_name.id_for_label }}">First Name</label>
+{{ profile_form.first_name }}
+{% for error in profile_form.first_name.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+
+<div class="col-md-6">
+<label class="form-label" for="{{ profile_form.last_name.id_for_label }}">Last Name</label>
+{{ profile_form.last_name }}
+{% for error in profile_form.last_name.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+
+<div class="col-md-6">
+<label class="form-label" for="{{ profile_form.username.id_for_label }}">Username</label>
+{{ profile_form.username }}
+{% for error in profile_form.username.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+
+<div class="col-md-6">
+<label class="form-label" for="{{ profile_form.email.id_for_label }}">Email</label>
+{{ profile_form.email }}
+{% for error in profile_form.email.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+
+<div class="col-md-6">
+<label class="form-label" for="{{ profile_form.role.id_for_label }}">Role</label>
+{{ profile_form.role }}
+{% if profile_form.role.help_text %}
+<div class="form-text">{{ profile_form.role.help_text }}</div>
+{% endif %}
+{% for error in profile_form.role.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+
+<div class="col-md-6">
+<label class="form-label" for="{{ profile_form.specialty.id_for_label }}">Specialty</label>
+{{ profile_form.specialty }}
+{% if profile_form.specialty.help_text %}
+<div class="form-text">{{ profile_form.specialty.help_text }}</div>
+{% endif %}
+{% for error in profile_form.specialty.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+</div>
+
+<div class="form-check mt-3">
+{{ profile_form.is_active }}
+<label class="form-check-label" for="{{ profile_form.is_active.id_for_label }}">Account is active</label>
+</div>
+{% for error in profile_form.is_active.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+
+<button type="submit" class="btn btn-primary mt-4">Save Changes</button>
+</form>
+</div>
+</div>
+</div>
+
+<div class="col-lg-5">
+<div class="card shadow-sm">
+<div class="card-body">
+<h4 class="fw-semibold mb-3">Reset Password</h4>
+<p class="text-muted small">Set a new temporary password for this staff user. Share it securely afterward.</p>
+
+<form method="post" action="{% url 'reset_staff_password' staff_user.id %}" novalidate>
+{% csrf_token %}
+
+{% if password_form.non_field_errors %}
+<div class="alert alert-danger">
+{{ password_form.non_field_errors }}
+</div>
+{% endif %}
+
+<div class="mb-3">
+<label class="form-label" for="{{ password_form.new_password1.id_for_label }}">New Password</label>
+{{ password_form.new_password1 }}
+{% if password_form.new_password1.help_text %}
+<div class="form-text">{{ password_form.new_password1.help_text|safe }}</div>
+{% endif %}
+{% for error in password_form.new_password1.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+
+<div class="mb-3">
+<label class="form-label" for="{{ password_form.new_password2.id_for_label }}">Confirm New Password</label>
+{{ password_form.new_password2 }}
+{% for error in password_form.new_password2.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+
+<button type="submit" class="btn btn-warning w-100">Reset Password</button>
+</form>
+</div>
+</div>
+
+<div class="card shadow-sm mt-4">
+<div class="card-body">
+<h5 class="fw-semibold mb-3">Account Summary</h5>
+<dl class="row mb-0">
+<dt class="col-5">Hospital</dt>
+<dd class="col-7">{{ staff_user.hospital.name }}</dd>
+<dt class="col-5">Role</dt>
+<dd class="col-7">{{ staff_user.get_role_display }}</dd>
+<dt class="col-5">Status</dt>
+<dd class="col-7">
+{% if staff_user.is_active %}
+<span class="badge bg-success">Active</span>
+{% else %}
+<span class="badge bg-secondary">Inactive</span>
+{% endif %}
+</dd>
+<dt class="col-5">Specialty</dt>
+<dd class="col-7">{{ staff_user.specialty|default:"-" }}</dd>
+</dl>
+</div>
+</div>
+</div>
+</div>
+
+{% endblock %}

@@ -25,7 +25,7 @@ def doctor_sla_metrics(target, hospital=None):
     return {}
 
 def calculate_metrics(doctor):
-    alerts = VitalAlert.objects.filter(assigned_doctor=doctor)
+    alerts = VitalAlert.objects.filter(doctor=doctor, patient__hospital=doctor.hospital)
     total = alerts.count()
     
     # Acknowledged alerts

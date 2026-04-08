@@ -49,6 +49,11 @@ class CustomUser(AbstractUser):
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"
 
+    @property
+    def full_name(self):
+        name = self.get_full_name().strip()
+        return name or self.username
+
 
     # ✅ Add these helper methods
     def is_admin(self):

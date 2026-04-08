@@ -5,9 +5,18 @@
 
 {% block content %}
 
-<h3 class="fw-bold mb-4 text-primary">
-<i class="bi bi-person-heart me-2"></i> Doctor Dashboard
-</h3>
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+<div>
+<h2 class="fw-bold text-primary mb-1">
+<i class="bi bi-person-heart me-2"></i>Doctor Dashboard
+</h2>
+<p class="text-muted mb-0">Review your patient load, appointments, and active care queue.</p>
+</div>
+<div class="d-flex gap-2">
+<a href="{% url 'patient_list' %}" class="btn btn-outline-primary">Patient List</a>
+<a href="{% url 'doctor_prescriptions' %}" class="btn btn-outline-secondary">My Prescriptions</a>
+</div>
+</div>
 
 <!-- KPI CARDS -->
 <div class="row g-3 mb-4">
@@ -70,7 +79,6 @@
 </div>
 
 
-<!-- QUICK ACTIONS -->
 <div class="row g-3 mb-4">
 
 <div class="col-md-4">
@@ -112,13 +120,13 @@ View Alerts
 </div>
 
 
-<!-- PATIENT TABLE -->
 <div class="card shadow-sm border-0">
 
 <div class="card-body">
 
 <div class="d-flex justify-content-between align-items-center mb-3">
 <h5 class="fw-bold mb-0">Assigned Patients</h5>
+<span class="badge bg-secondary">{{ patients|length }} shown</span>
 </div>
 
 {% if patients %}
@@ -179,44 +187,90 @@ No patients assigned yet.
 </div>
 </div>
 
-<h4>Patient Queue</h4>
+<div class="row g-4">
+<div class="col-lg-7">
+<div class="card shadow-sm border-0">
+<div class="card-body">
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h5 class="fw-bold mb-0">Patient Queue</h5>
+<span class="badge bg-secondary">{{ queue|length }} waiting</span>
+</div>
 
-<table class="table table-bordered">
+{% if queue %}
+<div class="table-responsive">
+<table class="table table-hover align-middle mb-0">
+<thead class="table-light">
 <tr>
 <th>#</th>
 <th>Patient</th>
 <th>Status</th>
 <th>Priority</th>
-<th>Action</th>
+<th class="text-end">Action</th>
 </tr>
-
+</thead>
+<tbody>
 {% for visit in queue %}
-
 <tr>
-
 <td>{{ forloop.counter }}</td>
-
 <td>{{ visit.patient.full_name }}</td>
-
-<td>{{ visit.status }}</td>
-
+<td>{{ visit.get_status_display }}</td>
 <td>
-    {% if visit.is_emergency %}
-        <span class="badge bg-danger">Emergency</span>
-    {% else %}
-        <span class="badge bg-secondary">Normal</span>
-    {% endif %}
+{% if visit.is_emergency %}
+<span class="badge bg-danger">Emergency</span>
+{% else %}
+<span class="badge bg-secondary">Normal</span>
+{% endif %}
 </td>
-
-<td>
-<a href="{% url 'patient_emr' visit.patient.id %}" class="btn btn-sm btn-primary">
-Open
-</a>
+<td class="text-end">
+<a href="{% url 'patient_emr' visit.patient.id %}" class="btn btn-sm btn-primary">Open</a>
 </td>
-
 </tr>
-
 {% endfor %}
+</tbody>
 </table>
+</div>
+{% else %}
+<div class="alert alert-light border mb-0">No patients are waiting in your queue.</div>
+{% endif %}
+</div>
+</div>
+</div>
+
+<div class="col-lg-5">
+<div class="card shadow-sm border-0">
+<div class="card-body">
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h5 class="fw-bold mb-0">Today's Appointments</h5>
+<span class="badge bg-secondary">{{ today_appointments|length }} today</span>
+</div>
+
+{% if today_appointments %}
+<div class="table-responsive">
+<table class="table table-hover align-middle mb-0">
+<thead class="table-light">
+<tr>
+<th>Time</th>
+<th>Patient</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+{% for appointment in today_appointments %}
+<tr>
+<td>{{ appointment.time|time:"g:i a" }}</td>
+<td>{{ appointment.patient.full_name }}</td>
+<td>{{ appointment.get_status_display }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% else %}
+<div class="alert alert-light border mb-0">No appointments scheduled for today.</div>
+{% endif %}
+</div>
+</div>
+</div>
+</div>
 
 {% endblock %}

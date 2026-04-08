@@ -29,7 +29,7 @@
 
 <h6 class="text-light px-3">SLA Monitoring</h6>
 
-<a class="nav-link text-white" href="{% url 'sla_settings' %}">
+<a class="nav-link text-white" href="{% url 'hospital_sla_settings' %}">
 <i class="bi bi-gear me-2"></i> SLA Policies
 </a>
 
@@ -131,6 +131,273 @@ Welcome <strong>{{ user.username }}</strong>. Overview of financial performance 
 <div class="card-body">
 <h6>Escalations</h6>
 <h3 class="text-warning">{{ escalations|default:"—" }}</h3>
+</div>
+</div>
+</div>
+
+</div>
+
+<div class="row mt-4">
+
+<div class="col-lg-5 mb-4">
+<div class="card shadow-sm">
+<div class="card-body">
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h4 class="fw-semibold mb-3">Create Staff User</h4>
+<a href="{% url 'register' %}" class="btn btn-sm btn-outline-primary">Open Full Page</a>
+</div>
+<p class="text-muted small mb-3">New users created here will belong to <strong>{{ request.user.hospital.name }}</strong>.</p>
+
+<form method="post" novalidate>
+{% csrf_token %}
+
+{% if form.non_field_errors %}
+<div class="alert alert-danger">
+{{ form.non_field_errors }}
+</div>
+{% endif %}
+
+<div class="mb-3">
+<label class="form-label" for="{{ form.first_name.id_for_label }}">First Name</label>
+{{ form.first_name }}
+{% for error in form.first_name.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+
+<div class="mb-3">
+<label class="form-label" for="{{ form.last_name.id_for_label }}">Last Name</label>
+{{ form.last_name }}
+{% for error in form.last_name.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+
+<div class="mb-3">
+<label class="form-label" for="{{ form.username.id_for_label }}">Username</label>
+{{ form.username }}
+{% for error in form.username.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+
+<div class="mb-3">
+<label class="form-label" for="{{ form.email.id_for_label }}">Email</label>
+{{ form.email }}
+{% for error in form.email.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+
+<div class="mb-3">
+<label class="form-label" for="{{ form.role.id_for_label }}">Role</label>
+{{ form.role }}
+{% if form.role.help_text %}
+<div class="form-text">{{ form.role.help_text }}</div>
+{% endif %}
+{% for error in form.role.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+
+<div class="mb-3">
+<label class="form-label" for="{{ form.specialty.id_for_label }}">Specialty</label>
+{{ form.specialty }}
+{% if form.specialty.help_text %}
+<div class="form-text">{{ form.specialty.help_text }}</div>
+{% endif %}
+{% for error in form.specialty.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+
+<div class="mb-3">
+<label class="form-label" for="{{ form.password1.id_for_label }}">Password</label>
+{{ form.password1 }}
+{% for error in form.password1.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+
+<div class="mb-3">
+<label class="form-label" for="{{ form.password2.id_for_label }}">Confirm Password</label>
+{{ form.password2 }}
+{% for error in form.password2.errors %}
+<div class="text-danger small">{{ error }}</div>
+{% endfor %}
+</div>
+
+<button type="submit" class="btn btn-primary w-100">Create User</button>
+</form>
+</div>
+</div>
+</div>
+
+<div class="col-lg-7 mb-4">
+<div class="row g-3 mb-3">
+<div class="col-md-4">
+<div class="card border-0 bg-light h-100">
+<div class="card-body">
+<h6 class="text-muted mb-2">Total Staff</h6>
+<div class="fs-4 fw-semibold">{{ total_staff_count }}</div>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card border-0 bg-light h-100">
+<div class="card-body">
+<h6 class="text-muted mb-2">Active Staff</h6>
+<div class="fs-4 fw-semibold text-success">{{ active_staff_count }}</div>
+</div>
+</div>
+</div>
+<div class="col-md-4">
+<div class="card border-0 bg-light h-100">
+<div class="card-body">
+<h6 class="text-muted mb-2">Inactive Staff</h6>
+<div class="fs-4 fw-semibold text-secondary">{{ inactive_staff_count }}</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="card shadow-sm">
+<div class="card-body">
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h4 class="fw-semibold mb-0">Hospital Staff</h4>
+<span class="badge bg-secondary">{{ filtered_staff_count }} shown</span>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+<div class="col-md-6">
+<input
+type="text"
+name="staff_query"
+value="{{ staff_query }}"
+class="form-control"
+placeholder="Search username, name, email, or specialty"
+>
+</div>
+<div class="col-md-4">
+<select name="staff_role" class="form-select">
+<option value="">All roles</option>
+{% for value, label in staff_role_choices %}
+<option value="{{ value }}"{% if staff_role == value %} selected{% endif %}>{{ label }}</option>
+{% endfor %}
+</select>
+</div>
+<div class="col-md-2 d-grid">
+<button type="submit" class="btn btn-outline-primary">Filter</button>
+</div>
+</form>
+
+{% if staff_query or staff_role %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+<p class="text-muted small mb-0">Filtered results for the selected staff criteria.</p>
+<a href="{% url 'admin_dashboard' %}" class="btn btn-sm btn-link">Clear filters</a>
+</div>
+{% endif %}
+
+<div class="table-responsive">
+<table class="table align-middle">
+<thead>
+<tr>
+<th>Username</th>
+<th>Role</th>
+<th>Email</th>
+<th>Specialty</th>
+<th>Status</th>
+<th class="text-end">Action</th>
+</tr>
+</thead>
+<tbody>
+{% for staff_user in staff_users %}
+<tr>
+<td class="fw-semibold">{{ staff_user.username }}</td>
+<td>{{ staff_user.get_role_display }}</td>
+<td>
+{% if staff_user.first_name or staff_user.last_name %}
+<div>{{ staff_user.first_name }} {{ staff_user.last_name }}</div>
+{% endif %}
+<div>{{ staff_user.email|default:"-" }}</div>
+</td>
+<td>{{ staff_user.specialty|default:"-" }}</td>
+<td>
+{% if staff_user.is_active %}
+<span class="badge bg-success">Active</span>
+{% else %}
+<span class="badge bg-secondary">Inactive</span>
+{% endif %}
+</td>
+<td class="text-end">
+{% if staff_user != request.user %}
+<div class="d-flex justify-content-end gap-2">
+<a href="{% url 'edit_staff_user' staff_user.id %}" class="btn btn-sm btn-outline-primary">Manage</a>
+<form method="post" action="{% url 'toggle_user_active' staff_user.id %}">
+{% csrf_token %}
+{% if staff_user.is_active %}
+<button type="submit" class="btn btn-sm btn-outline-danger">Deactivate</button>
+{% else %}
+<button type="submit" class="btn btn-sm btn-outline-success">Activate</button>
+{% endif %}
+</form>
+</div>
+{% else %}
+<div class="d-flex justify-content-end gap-2">
+<a href="{% url 'edit_staff_user' staff_user.id %}" class="btn btn-sm btn-outline-primary">Manage</a>
+<span class="text-muted small align-self-center">Current user</span>
+</div>
+{% endif %}
+</td>
+</tr>
+{% empty %}
+<tr>
+<td colspan="6" class="text-muted text-center py-4">No staff users created yet.</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+
+<div class="row mt-2">
+<div class="col-12">
+<div class="card shadow-sm">
+<div class="card-body">
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h4 class="fw-semibold mb-0">Recent Staff Activity</h4>
+<span class="badge bg-light text-dark">{{ recent_staff_activity|length }} recent events</span>
+</div>
+
+<div class="table-responsive">
+<table class="table align-middle">
+<thead>
+<tr>
+<th>Time</th>
+<th>Admin</th>
+<th>Action</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody>
+{% for entry in recent_staff_activity %}
+<tr>
+<td class="text-nowrap">{{ entry.timestamp|date:"M d, Y H:i" }}</td>
+<td>{{ entry.user.username|default:"System" }}</td>
+<td><span class="badge bg-info-subtle text-dark text-uppercase">{{ entry.action }}</span></td>
+<td>{{ entry.description }}</td>
+</tr>
+{% empty %}
+<tr>
+<td colspan="4" class="text-muted text-center py-4">No recent staff management activity yet.</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
 </div>
 </div>
 </div>

@@ -31,7 +31,7 @@
       {% else %}table-success{% endif %}
     ">
       <td>{{ alert.patient.full_name }}</td>
-      <td>{{ alert.assigned_doctor.full_name }}</td>
+      <td>{{ alert.doctor.full_name|default:"Unassigned" }}</td>
       <td>{{ alert.message|truncatechars:40 }}</td>
 
       <td>

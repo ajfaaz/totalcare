@@ -7,8 +7,11 @@ urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
     path('redirect-by-role/', views.redirect_by_role, name='redirect_by_role'),
     
-     # Role Dashboards
+    # Role Dashboards
     path('admin-dashboard/', views.admin_dashboard, name='admin_dashboard'),
+    path('admin-dashboard/users/<int:user_id>/toggle-active/', views.toggle_user_active, name='toggle_user_active'),
+    path('admin-dashboard/users/<int:user_id>/edit/', views.edit_staff_user, name='edit_staff_user'),
+    path('admin-dashboard/users/<int:user_id>/reset-password/', views.reset_staff_password, name='reset_staff_password'),
     path('doctor-dashboard/', views.doctor_dashboard, name='doctor_dashboard'),
     path('receptionist-dashboard/', views.receptionist_dashboard, name='receptionist_dashboard'),
     path('accountant-dashboard/', views.accountant_dashboard, name='accountant_dashboard'),
@@ -120,6 +123,7 @@ urlpatterns = [
     # Appointments
     path('appointments/', views.appointment_list, name='appointment_list'),
     path('appointments/create/', views.create_appointment, name='create_appointment'),
+    path('appointments/<int:appointment_id>/check-in/', views.check_in_appointment, name='check_in_appointment'),
 
     # Billing
     path('bills/', views.bill_list, name='bill_list'),

@@ -1,6 +1,7 @@
 from io import BytesIO
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login
+from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Q, Max
 from django.db.models.functions import TruncMonth
@@ -8,6 +9,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.http import HttpResponse, HttpResponseForbidden
 from django.utils import timezone
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.template.loader import get_template
 from .models import MedicineCategory
 from billing.utils.vitals import evaluate_vitals
@@ -23,6 +25,8 @@ from .forms import (
     PaymentForm,
     AppointmentForm,
     CustomUserCreationForm,
+    StaffPasswordResetForm,
+    StaffUserUpdateForm,
     MedicalRecordForm,
     LabReportForm,
     RadiologyReportForm,
@@ -54,6 +58,9 @@ from .models import (
     
 )
 from billing.utils.sla import sla_remaining_time, sla_timer_state
+from billing.utils.sla_metrics import doctor_sla_metrics
+from billing.utils.department_sla import department_sla_metrics
+from billing.utils.scorecard import performance_grade
 from billing.utils.audit import log_action
 from billing.utils.billing import calculate_bill_split
 
@@ -61,6 +68,169 @@ from messaging.forms import MessageForm
 from messaging.models import Message
 
 User = get_user_model()
+
+
+def hospital_scoped_or_404(model, user, **filters):
+    return get_object_or_404(model, hospital=user.hospital, **filters)
+
+
+def ensure_active_visit_for_appointment(appointment, started_by):
+    active_visit = (
+        PatientVisit.objects.filter(
+            patient=appointment.patient,
+            hospital=appointment.hospital,
+            is_active=True,
+        )
+        .exclude(status="completed")
+        .first()
+    )
+
+    if active_visit:
+        updated_fields = []
+        if appointment.doctor and active_visit.assigned_doctor_id != appointment.doctor_id:
+            active_visit.assigned_doctor = appointment.doctor
+            updated_fields.append("assigned_doctor")
+        if started_by and active_visit.assigned_by_id != started_by.id:
+            active_visit.assigned_by = started_by
+            updated_fields.append("assigned_by")
+        if active_visit.status not in ["pending", "under_diagnosis", "lab_requested", "radiology_requested", "lab_completed", "radiology_completed", "prescribed"]:
+            active_visit.status = "pending"
+            updated_fields.append("status")
+        if updated_fields:
+            active_visit.save(update_fields=updated_fields)
+        return active_visit, False
+
+    visit = PatientVisit.objects.create(
+        hospital=appointment.hospital,
+        patient=appointment.patient,
+        assigned_doctor=appointment.doctor,
+        assigned_by=started_by,
+        status="pending",
+        is_active=True,
+        is_emergency=appointment.is_walk_in,
+    )
+    return visit, True
+
+
+def build_admin_dashboard_context(request, form=None):
+    hospital = request.user.hospital
+    last_30_days = timezone.now() - timedelta(days=30)
+    staff_query = request.GET.get("staff_query", "").strip()
+    staff_role = request.GET.get("staff_role", "").strip()
+
+    if form is None:
+        form = CustomUserCreationForm()
+
+    income_by_month = (
+        Payment.objects.filter(hospital=hospital)
+        .annotate(month=TruncMonth("paid_on"))
+        .values("month")
+        .annotate(total=Sum("amount_paid"))
+        .order_by("month")
+    )
+
+    total_income = Payment.objects.filter(hospital=hospital).aggregate(
+        total=Sum("amount_paid")
+    )["total"] or 0
+    monthly_income = Payment.objects.filter(
+        hospital=hospital,
+        paid_on__gte=last_30_days
+    ).aggregate(total=Sum("amount_paid"))["total"] or 0
+
+    total_alerts = VitalAlert.objects.filter(patient__hospital=hospital).count()
+    critical_open = VitalAlert.objects.filter(
+        patient__hospital=hospital,
+        status__in=["open", "acknowledged", "escalated"],
+        vital__status="critical",
+    ).count()
+    escalations = VitalAlert.objects.filter(
+        patient__hospital=hospital,
+        escalated=True
+    ).count()
+    resolved_alerts = VitalAlert.objects.filter(
+        patient__hospital=hospital,
+        status="resolved"
+    ).count()
+    sla_compliance = round((resolved_alerts / total_alerts) * 100, 1) if total_alerts else 100
+
+    staff_users = CustomUser.objects.filter(hospital=hospital)
+    total_staff_count = staff_users.count()
+    active_staff_count = staff_users.filter(is_active=True).count()
+    inactive_staff_count = total_staff_count - active_staff_count
+
+    if staff_query:
+        staff_users = staff_users.filter(
+            Q(username__icontains=staff_query)
+            | Q(email__icontains=staff_query)
+            | Q(first_name__icontains=staff_query)
+            | Q(last_name__icontains=staff_query)
+            | Q(specialty__icontains=staff_query)
+        )
+
+    if staff_role:
+        staff_users = staff_users.filter(role=staff_role)
+
+    filtered_staff_count = staff_users.count()
+    staff_users = staff_users.order_by("role", "username")
+    recent_staff_activity = AuditLog.objects.filter(
+        user__hospital=hospital,
+        model_name="CustomUser",
+    ).select_related("user")[:10]
+
+    return {
+        "form": form,
+        "staff_users": staff_users,
+        "staff_query": staff_query,
+        "staff_role": staff_role,
+        "staff_role_choices": CustomUser.USER_ROLE_CHOICES,
+        "total_staff_count": total_staff_count,
+        "active_staff_count": active_staff_count,
+        "inactive_staff_count": inactive_staff_count,
+        "filtered_staff_count": filtered_staff_count,
+        "recent_staff_activity": recent_staff_activity,
+        "chart_labels": [entry["month"].strftime("%b %Y") for entry in income_by_month],
+        "chart_data": [entry["total"] for entry in income_by_month],
+        "patient_count": Patient.objects.filter(hospital=hospital).count(),
+        "appointment_count": Appointment.objects.filter(hospital=hospital).count(),
+        "bill_count": Bill.objects.filter(hospital=hospital).count(),
+        "total_income": total_income,
+        "monthly_income": monthly_income,
+        "total_alerts": total_alerts,
+        "critical_open": critical_open,
+        "sla_compliance": sla_compliance,
+        "escalations": escalations,
+        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
+    }
+
+
+def build_accountant_dashboard_context(user):
+    hospital = user.hospital
+    nhis = Payer.objects.filter(code="NHIS").first()
+    kschma = Payer.objects.filter(code="KSCHMA").first()
+
+    government_bills = Bill.objects.filter(
+        hospital=hospital,
+        third_party__payer_type__in=["federal", "state"],
+    ).select_related("patient", "third_party")
+
+    nhis_bills = government_bills.filter(patient__patientcoverage__payer=nhis).order_by("-created_at")
+    kschma_bills = government_bills.filter(patient__patientcoverage__payer=kschma).order_by("-created_at")
+
+    def bill_totals(qs):
+        return {
+            "total": qs.aggregate(t=Sum("third_party_payable"))["t"] or 0,
+            "paid": qs.filter(is_fully_paid=True).aggregate(p=Sum("third_party_payable"))["p"] or 0,
+            "unpaid": qs.filter(is_fully_paid=False).aggregate(u=Sum("third_party_payable"))["u"] or 0,
+        }
+
+    return {
+        "nhis": bill_totals(nhis_bills),
+        "kschma": bill_totals(kschma_bills),
+        "nhis_bills": nhis_bills[:10],
+        "kschma_bills": kschma_bills[:10],
+        "government_bill_count": government_bills.count(),
+        "unread_count": Message.objects.filter(recipient=user, is_read=False).count(),
+    }
 
 # =======================================================
 # DASHBOARD
@@ -114,7 +284,7 @@ def dashboard(request):
         pending_tests = LabTestRequest.objects.filter(
             hospital=hospital,
             status="requested",
-            visit__status="active"
+            visit__is_active=True
         )
     
         completed_today = LabTestRequest.objects.filter(
@@ -168,8 +338,16 @@ def dashboard(request):
             hospital=hospital,
             date=today
         )
-    
-        checked_in = today_appointments_qs.filter(status="checked_in").count()
+
+        checked_in_patient_ids = set(
+            PatientVisit.objects.filter(
+                hospital=hospital,
+                is_active=True,
+                patient__appointment__date=today,
+            )
+            .exclude(status="completed")
+            .values_list("patient_id", flat=True)
+        )
         walkins = today_appointments_qs.filter(is_walk_in=True).count()
     
         return render(request, "billing/dashboard_receptionist.html", {
@@ -184,7 +362,7 @@ def dashboard(request):
                 created_at__date=today
             ).count(),
     
-            "checked_in": checked_in,
+            "checked_in": len(checked_in_patient_ids),
     
             "walkins": walkins,
     
@@ -195,69 +373,65 @@ def dashboard(request):
                 "doctor"
             ).order_by("time"),
         })
-        
+
     # ==============================
     # DOCTOR DASHBOARD
     # ==============================
+    if user.role == "doctor":
+        query = request.GET.get("q")
+        last_30_days = timezone.now() - timedelta(days=30)
 
-        # ✅ Proper indentation: everything inside the function
-        if user.role == "doctor":
-            
-            query = request.GET.get("q")
-            
-            patients = Patient.objects.filter(
-                hospital=hospital
-            )
-            
-            if query:
-                patients = patients.filter(
-                    Q(first_name__icontains=query) |
-                    Q(last_name__icontains=query) |
-                    Q(patient_id__icontains=query)
-                )
-            
-            return render(request, "billing/dashboard_doctor.html", {
-                **base_context,
-                "patients": patients[:50],
-                "active_visits": PatientVisit.objects.filter(
-                    hospital=hospital,
-                    assigned_doctor=user
-                ).exclude(status="completed").select_related("patient"),
-                "queue": PatientVisit.objects.filter(  # ✅ "queue": not queue =
-                    hospital=hospital,
-                    status__in=["pending", "under_diagnosis"]
-                ).select_related("patient").order_by(
-                    "-is_emergency",
-                    "created_at"
-                ),
-                "today_appointments": Appointment.objects.filter(
-                    doctor=user,
-                    date=timezone.localdate()
-                ).select_related("patient")
-            })
+        patients = Patient.objects.filter(
+            hospital=hospital,
+            patientvisit__assigned_doctor=user,
+        ).distinct()
+
+        if query:
+            patients = patients.filter(full_name__icontains=query)
+
+        active_visits = PatientVisit.objects.filter(
+            hospital=hospital,
+            assigned_doctor=user,
+        ).exclude(status="completed").select_related("patient")
+
+        queue = PatientVisit.objects.filter(
+            hospital=hospital,
+            assigned_doctor=user,
+            status__in=["pending", "under_diagnosis"],
+        ).select_related("patient").order_by("-is_emergency", "created_at")
+
+        doctor_prescriptions = Prescription.objects.filter(hospital=hospital, doctor=user)
+        prescriptions_issued = doctor_prescriptions.count()
+        prescriptions_dispensed = doctor_prescriptions.filter(status="dispensed").count()
+        completion_rate = round((prescriptions_dispensed / prescriptions_issued) * 100) if prescriptions_issued else 0
+        today_appointments = Appointment.objects.filter(
+            hospital=hospital,
+            doctor=user,
+            date=timezone.localdate(),
+        ).select_related("patient")
+
+        return render(request, "billing/dashboard_doctor.html", {
+            **base_context,
+            "patients": patients[:50],
+            "doctor_patient_count": patients.count(),
+            "visits_last_30": PatientVisit.objects.filter(
+                hospital=hospital,
+                assigned_doctor=user,
+                created_at__gte=last_30_days,
+            ).count(),
+            "prescriptions_issued": prescriptions_issued,
+            "prescriptions_dispensed": prescriptions_dispensed,
+            "completion_rate": completion_rate,
+            "active_visits": active_visits,
+            "queue": queue,
+            "today_appointments": today_appointments,
+        })
         
     # ==============================
     # ADMIN DASHBOARD
     # ==============================
     if user.role == "admin":
-        income_by_month = (
-            Payment.objects.filter(hospital=hospital)
-            .annotate(month=TruncMonth("paid_on"))
-            .values("month")
-            .annotate(total=Sum("amount_paid"))
-            .order_by("month")
-        )
-        return render(request, "billing/dashboard_admin.html", {
-            **base_context,
-            "chart_labels": [entry["month"].strftime("%b %Y") for entry in income_by_month],
-            "chart_data": [entry["total"] for entry in income_by_month],
-            "patient_count": Patient.objects.filter(hospital=hospital).count(),
-            "appointment_count": Appointment.objects.filter(hospital=hospital).count(),
-            "bill_count": Bill.objects.filter(hospital=hospital).count(),
-            "total_income": Payment.objects.filter(hospital=hospital).aggregate(
-                total=Sum("amount_paid")
-            )["total"] or 0,
-        })
+        return admin_dashboard(request)
     
 
     # ==============================
@@ -288,8 +462,8 @@ def redirect_by_role(request):
         "doctor": "doctor_dashboard",
         "receptionist": "receptionist_dashboard",
         "accountant": "accountant_dashboard",
-        "radiologist": "radiologist_dashboard",
-        "lab_technician": "lab_dashboard",
+        "radiologist": "radiology_dashboard",
+        "lab": "lab_dashboard",
         "pharmacist": "pharmacist_dashboard",
     }
     return redirect(role_redirects.get(request.user.role, "dashboard"))
@@ -302,9 +476,17 @@ def redirect_by_role(request):
 @login_required
 def patient_list(request):
     query = request.GET.get("q", "")
-    patients = Patient.objects.filter(hospital=request.user.hospital)
+    patients = Patient.objects.filter(hospital=request.user.hospital).order_by("full_name")
     if query:
         patients = patients.filter(full_name__icontains=query)
+    active_visit_patient_ids = set(
+        PatientVisit.objects.filter(
+            hospital=request.user.hospital,
+            is_active=True,
+        ).exclude(status="completed").values_list("patient_id", flat=True)
+    )
+    for patient in patients:
+        patient.active_visit = patient.id in active_visit_patient_ids
     return render(request, "billing/patient_list.html", {"patients": patients, "query": query})
 
 
@@ -315,7 +497,7 @@ def patient_detail(request, patient_id):
     Kept lightweight to avoid adding a new template; callers expecting
     a patient detail page will be forwarded to the EMR view.
     """
-    patient = get_object_or_404(Patient, id=patient_id)
+    patient = hospital_scoped_or_404(Patient, request.user, id=patient_id)
     return redirect("patient_emr", patient_id=patient.id)
 
 
@@ -413,7 +595,11 @@ def appointment_list(request):
 def create_appointment(request):
     hospital = request.user.hospital
     patients = Patient.objects.filter(hospital=hospital)
-    doctors = CustomUser.objects.filter(role="doctor", hospital=hospital)
+    doctors = CustomUser.objects.filter(
+        role="doctor",
+        hospital=hospital,
+        is_active=True,
+    ).order_by("first_name", "last_name", "username")
     preselected_patient_id = request.GET.get("patient")
 
     if request.method == "POST":
@@ -424,24 +610,41 @@ def create_appointment(request):
         reason = request.POST.get("reason")
 
         patient = get_object_or_404(Patient, id=patient_id, hospital=hospital)
-        doctor = get_object_or_404(CustomUser, id=doctor_id, hospital=hospital)
-
-        Appointment.objects.create(
+        doctor = get_object_or_404(
+            CustomUser,
+            id=doctor_id,
             hospital=hospital,
-            patient=patient,
-            doctor=doctor,
-            date=date,
-            time=time,
-            reason=reason,
-            status="scheduled",
+            role="doctor",
+            is_active=True,
         )
-        messages.success(request, "Appointment created successfully.")
-        return redirect("appointment_list")
+
+        try:
+            Appointment.objects.create(
+                hospital=hospital,
+                patient=patient,
+                doctor=doctor,
+                date=date,
+                time=time,
+                reason=reason,
+                status="scheduled",
+            )
+        except Exception:
+            messages.error(
+                request,
+                "That doctor already has an appointment at the selected date and time.",
+            )
+        else:
+            messages.success(request, "Appointment created successfully.")
+            return redirect("appointment_list")
 
     return render(
         request,
         "billing/create_appointment.html",
-        {"patients": patients, "doctors": doctors, "preselected_patient_id": preselected_patient_id},
+        {
+            "patients": patients,
+            "doctors": doctors,
+            "preselected_patient_id": preselected_patient_id,
+        },
     )
 
 
@@ -462,7 +665,7 @@ def create_bill_index(request):
 
 @login_required
 def create_bill(request, patient_id):
-    patient = get_object_or_404(Patient, id=patient_id)
+    patient = hospital_scoped_or_404(Patient, request.user, id=patient_id)
     services = Service.objects.filter(hospital=patient.hospital)
     # include patient coverage info in template context
     coverage = getattr(patient, "patientcoverage", None)
@@ -473,7 +676,7 @@ def create_bill(request, patient_id):
         quantities = request.POST.getlist("quantity")
 
         for i in range(len(service_ids)):
-            service = get_object_or_404(Service, id=service_ids[i])
+            service = get_object_or_404(Service, id=service_ids[i], hospital=patient.hospital)
             qty = int(quantities[i])
             subtotal = service.price * qty
             total += subtotal
@@ -510,7 +713,7 @@ def create_bill(request, patient_id):
 
 @login_required
 def view_invoice(request, bill_id):
-    bill = get_object_or_404(Bill, id=bill_id)
+    bill = hospital_scoped_or_404(Bill, request.user, id=bill_id)
     items = bill.items.all()
     payments = bill.payment_set.all()
     paid = sum(p.amount_paid for p in payments)
@@ -524,7 +727,7 @@ def view_invoice(request, bill_id):
 
 @login_required
 def download_invoice_pdf(request, bill_id):
-    bill = get_object_or_404(Bill, id=bill_id)
+    bill = hospital_scoped_or_404(Bill, request.user, id=bill_id)
     items = bill.items.all()
     payments = bill.payment_set.all()
     paid = sum(p.amount_paid for p in payments)
@@ -547,7 +750,7 @@ def download_invoice_pdf(request, bill_id):
 
 @login_required
 def record_payment(request, bill_id):
-    bill = get_object_or_404(Bill, id=bill_id)
+    bill = hospital_scoped_or_404(Bill, request.user, id=bill_id)
     if request.method == "POST":
         amount = request.POST.get("amount")
         payment_method = request.POST.get("payment_method")
@@ -813,7 +1016,9 @@ def patient_emr(request, patient_id):
         )
     else:
         active_visit = visits.filter(
-            status__in=["pending", "under_diagnosis"]
+            is_active=True
+        ).exclude(
+            status="completed"
         ).first()
 
     # ==============================
@@ -824,10 +1029,18 @@ def patient_emr(request, patient_id):
         hospital=request.user.hospital
     ).select_related("visit", "doctor").order_by("-requested_at")
 
+    lab_reports = LabReport.objects.filter(
+        patient=patient
+    ).select_related("lab_technician").order_by("-date")
+
     radiology_requests = RadiologyRequest.objects.filter(
         visit__patient=patient,
         hospital=request.user.hospital
     ).select_related("visit", "doctor").order_by("-requested_at")
+
+    radiology_reports = RadiologyReport.objects.filter(
+        patient=patient
+    ).select_related("radiologist").order_by("-created_at")
 
     # ==============================
     # NOTES / RECORDS
@@ -874,7 +1087,20 @@ def patient_emr(request, patient_id):
     vital_alerts = VitalAlert.objects.filter(
         patient=patient,
         patient__hospital=request.user.hospital
-    ).exclude(status="resolved")
+    ).exclude(status="resolved").prefetch_related("logs__performed_by").order_by("-created_at")
+
+    latest_medical_record = medical_records.first()
+    latest_note = notes.first()
+
+    summary = {
+        "record_count": medical_records.count(),
+        "lab_count": lab_tests.count(),
+        "lab_report_count": lab_reports.count(),
+        "radiology_count": radiology_requests.count(),
+        "radiology_report_count": radiology_reports.count(),
+        "prescription_count": prescriptions.count(),
+        "visit_count": visits.count(),
+    }
 
     # ==============================
     # CONTEXT
@@ -888,7 +1114,9 @@ def patient_emr(request, patient_id):
         "notes": notes,
 
         "lab_tests": lab_tests,
+        "lab_reports": lab_reports,
         "radiology_requests": radiology_requests,
+        "radiology_reports": radiology_reports,
 
         "prescriptions": prescriptions,
 
@@ -897,6 +1125,9 @@ def patient_emr(request, patient_id):
         "vitals_status": vitals_status,
         "vital_alerts": vital_alerts,
         "linked_alert": alert,
+        "latest_medical_record": latest_medical_record,
+        "latest_note": latest_note,
+        "summary": summary,
 
         "unread_count": Message.objects.filter(
             recipient=request.user,
@@ -949,20 +1180,29 @@ def add_medical_record(request, patient_id):
         title = request.POST.get("title", "").strip()
         notes = request.POST.get("notes", "").strip()
         alert_id = request.POST.get("alert_id")
+        visit_id = request.POST.get("visit_id")
         
         if not title or not notes:
             messages.error(request, "Title and notes are required.")
             return redirect("patient_emr", patient_id=patient.id)
+
+        visit = None
+        if visit_id:
+            visit = get_object_or_404(
+                PatientVisit,
+                id=visit_id,
+                patient=patient,
+                hospital=request.user.hospital,
+            )
         
         # Create medical record 
-        # Added title=title if your model has a title/subject field
         MedicalRecord.objects.create(
             patient=patient,
+            visit=visit,
             doctor=request.user,
             notes=notes,
-            # title=title,  <-- Add this if your MedicalRecord model has a title field
             note_type="doctor_note",
-            diagnosis="Doctor Note",
+            diagnosis=title,
             treatment="See notes"
         )
         
@@ -1002,8 +1242,8 @@ def add_doctor_note(request, patient_id):
     visits = PatientVisit.objects.filter(
         patient=patient,
         hospital=request.user.hospital,
-        status__in=["pending", "under_diagnosis"]
-    )
+        is_active=True,
+    ).exclude(status="completed").order_by("-created_at")
     
     if request.method == "POST":
         visit_id = request.POST.get("visit_id")
@@ -1017,11 +1257,12 @@ def add_doctor_note(request, patient_id):
         
         MedicalRecord.objects.create(
             patient=patient,
+            visit=visit,
             doctor=request.user,
             notes=notes,
+            note_type="doctor_note",
             diagnosis="Doctor Note",
             treatment="See notes",
-            
         )
         
         messages.success(request, "Doctor note added successfully.")
@@ -1046,12 +1287,23 @@ def add_emr_note(request, patient_id):
     if request.method == "POST":
         notes = request.POST.get("notes", "").strip()
         if notes:
+            active_visit = (
+                PatientVisit.objects.filter(
+                    patient=patient,
+                    hospital=request.user.hospital,
+                    is_active=True,
+                )
+                .exclude(status="completed")
+                .first()
+            )
             MedicalRecord.objects.create(
                 patient=patient,
+                visit=active_visit,
                 doctor=request.user,
                 notes=notes,
                 note_type="doctor_note",
-                hospital=request.user.hospital
+                diagnosis="Doctor Note",
+                treatment="See notes",
             )
             messages.success(request, "Doctor note added.")
     
@@ -1108,10 +1360,44 @@ def activate_visit(request, visit_id):
         hospital=request.user.hospital
     )
 
+    visit.is_active = True
     visit.status = "under_diagnosis"
-    visit.save()
+    visit.save(update_fields=["is_active", "status"])
 
     return redirect("dashboard")
+
+
+@login_required
+def check_in_appointment(request, appointment_id):
+    appointment = get_object_or_404(
+        Appointment.objects.select_related("patient", "doctor"),
+        id=appointment_id,
+        hospital=request.user.hospital,
+    )
+
+    if request.method != "POST":
+        return redirect("dashboard")
+
+    if request.user.role not in ["receptionist", "admin"]:
+        messages.error(request, "Unauthorized access.")
+        return redirect("dashboard")
+
+    today = timezone.localdate()
+    if appointment.date > today:
+        messages.error(request, "You cannot check in a future appointment yet.")
+        return redirect("dashboard")
+
+    if appointment.status == "cancelled":
+        messages.error(request, "Cancelled appointments cannot be checked in.")
+        return redirect("dashboard")
+
+    visit, created = ensure_active_visit_for_appointment(appointment, request.user)
+    if created:
+        messages.success(request, f"Visit started for {appointment.patient.full_name}.")
+    else:
+        messages.info(request, f"{appointment.patient.full_name} already has an active visit.")
+
+    return redirect(f"{reverse('patient_emr', args=[appointment.patient.id])}?visit={visit.id}")
 
 # =======================================================
 # 🔬 LAB & RADIOLOGY REPORTS
@@ -1184,8 +1470,7 @@ def add_radiology_report(request, patient_id):
 
 @login_required
 def complete_lab_test(request, test_id):
-
-    test = get_object_or_404(LabTestRequest, id=test_id)
+    test = hospital_scoped_or_404(LabTestRequest, request.user, id=test_id)
 
     if request.method == "POST":
 
@@ -1208,13 +1493,12 @@ from .models import LabTestRequest, PatientVisit, Patient
 
 @login_required
 def order_lab_test(request, patient_id):
-
-    patient = get_object_or_404(Patient, id=patient_id)
+    patient = hospital_scoped_or_404(Patient, request.user, id=patient_id)
 
     # find active visit
     visit = PatientVisit.objects.filter(
         patient=patient,
-        status="active"
+        is_active=True
     ).first()
 
     if not visit:
@@ -1819,18 +2103,38 @@ def hospital_login(request, slug=None):
 
 
 def register(request):
+    if not request.user.is_authenticated or request.user.role != "admin":
+        messages.error(request, "Only hospital admins can create staff accounts.")
+        return redirect("login")
+
+    hospital = request.user.hospital
+
     if request.method == "POST":
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            hospital, _ = Hospital.objects.get_or_create(name="Main Hospital")
-            user.hospital = hospital
-            user.save()
-            messages.success(request, "Account created successfully.")
-            return redirect("login")
+            new_user = form.save(hospital=hospital)
+            log_action(
+                request.user,
+                "create",
+                "CustomUser",
+                new_user.id,
+                f"Created staff user '{new_user.username}' with role '{new_user.role}'.",
+            )
+            messages.success(request, f"User '{new_user.username}' created successfully.")
+            return redirect("register")
     else:
         form = CustomUserCreationForm()
-    return render(request, "registration/register.html", {"form": form})
+
+    staff_users = CustomUser.objects.filter(hospital=hospital).order_by("role", "username")
+    return render(
+        request,
+        "registration/register.html",
+        {
+            "form": form,
+            "staff_users": staff_users,
+            "hospital": hospital,
+        },
+    )
 
 
 # =======================================================
@@ -1839,7 +2143,160 @@ def register(request):
 
 @login_required
 def admin_dashboard(request):
-    return render(request, "billing/dashboard_admin.html")
+    if request.user.role != "admin":
+        messages.error(request, "Unauthorized access.")
+        return redirect("dashboard")
+
+    hospital = request.user.hospital
+
+    if request.method == "POST":
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            new_user = form.save(hospital=hospital)
+            log_action(
+                request.user,
+                "create",
+                "CustomUser",
+                new_user.id,
+                f"Created staff user '{new_user.username}' with role '{new_user.role}'.",
+            )
+            messages.success(request, f"User '{new_user.username}' created successfully.")
+            return redirect("admin_dashboard")
+    else:
+        form = CustomUserCreationForm()
+
+    return render(request, "billing/dashboard_admin.html", build_admin_dashboard_context(request, form=form))
+
+
+@login_required
+def toggle_user_active(request, user_id):
+    if request.user.role != "admin":
+        messages.error(request, "Unauthorized access.")
+        return redirect("dashboard")
+
+    staff_user = hospital_scoped_or_404(CustomUser, request.user, id=user_id)
+
+    if request.method != "POST":
+        return redirect("admin_dashboard")
+
+    if staff_user == request.user:
+        messages.error(request, "You cannot deactivate your own account.")
+        return redirect("admin_dashboard")
+
+    staff_user.is_active = not staff_user.is_active
+    staff_user.save(update_fields=["is_active"])
+
+    status_label = "activated" if staff_user.is_active else "deactivated"
+    log_action(
+        request.user,
+        "update",
+        "CustomUser",
+        staff_user.id,
+        f"{status_label.capitalize()} staff user '{staff_user.username}'.",
+    )
+    messages.success(request, f"User '{staff_user.username}' {status_label} successfully.")
+    return redirect("admin_dashboard")
+
+
+@login_required
+def edit_staff_user(request, user_id):
+    if request.user.role != "admin":
+        messages.error(request, "Unauthorized access.")
+        return redirect("dashboard")
+
+    staff_user = hospital_scoped_or_404(CustomUser, request.user, id=user_id)
+
+    if request.method == "POST":
+        profile_form = StaffUserUpdateForm(request.POST, instance=staff_user)
+        password_form = StaffPasswordResetForm(staff_user)
+
+        if profile_form.is_valid():
+            original_values = {
+                "first_name": staff_user.first_name,
+                "last_name": staff_user.last_name,
+                "username": staff_user.username,
+                "email": staff_user.email,
+                "role": staff_user.role,
+                "specialty": staff_user.specialty or "",
+                "is_active": staff_user.is_active,
+            }
+            updated_user = profile_form.save(commit=False)
+            updated_user.hospital = request.user.hospital
+            if updated_user == request.user and not updated_user.is_active:
+                messages.error(request, "You cannot deactivate your own account.")
+            else:
+                updated_user.save()
+                changed_fields = []
+                for field_name, old_value in original_values.items():
+                    new_value = getattr(updated_user, field_name) or ""
+                    if old_value != new_value:
+                        changed_fields.append(field_name.replace("_", " "))
+                description = f"Updated staff user '{updated_user.username}'."
+                if changed_fields:
+                    description = (
+                        f"Updated staff user '{updated_user.username}' fields: "
+                        + ", ".join(changed_fields)
+                        + "."
+                    )
+                log_action(
+                    request.user,
+                    "update",
+                    "CustomUser",
+                    updated_user.id,
+                    description,
+                )
+                messages.success(request, f"User '{updated_user.username}' updated successfully.")
+                return redirect("edit_staff_user", user_id=staff_user.id)
+    else:
+        profile_form = StaffUserUpdateForm(instance=staff_user)
+        password_form = StaffPasswordResetForm(staff_user)
+
+    return render(
+        request,
+        "billing/admin/manage_staff_user.html",
+        {
+            "staff_user": staff_user,
+            "profile_form": profile_form,
+            "password_form": password_form,
+        },
+    )
+
+
+@login_required
+def reset_staff_password(request, user_id):
+    if request.user.role != "admin":
+        messages.error(request, "Unauthorized access.")
+        return redirect("dashboard")
+
+    staff_user = hospital_scoped_or_404(CustomUser, request.user, id=user_id)
+
+    if request.method != "POST":
+        return redirect("edit_staff_user", user_id=staff_user.id)
+
+    profile_form = StaffUserUpdateForm(instance=staff_user)
+    password_form = StaffPasswordResetForm(staff_user, request.POST)
+
+    if password_form.is_valid():
+        password_form.save()
+        log_action(
+            request.user,
+            "update",
+            "CustomUser",
+            staff_user.id,
+            f"Reset password for staff user '{staff_user.username}'.",
+        )
+        messages.success(request, f"Password reset successfully for '{staff_user.username}'.")
+        return redirect("edit_staff_user", user_id=staff_user.id)
+
+    return render(
+        request,
+        "billing/admin/manage_staff_user.html",
+        {
+            "staff_user": staff_user,
+            "profile_form": profile_form,
+            "password_form": password_form,
+        },
+    )
 
 @login_required
 def doctor_dashboard(request):
@@ -1852,7 +2309,15 @@ def receptionist_dashboard(request):
 
 @login_required
 def accountant_dashboard(request):
-    return render(request, "billing/dashboard_accountant.html")
+    if request.user.role != "accountant":
+        messages.error(request, "Unauthorized access.")
+        return redirect("dashboard")
+
+    return render(
+        request,
+        "billing/dashboard_accountant.html",
+        build_accountant_dashboard_context(request.user),
+    )
 
 @login_required
 def radiologist_dashboard(request):
@@ -1903,15 +2368,18 @@ def add_prescription(request, patient_id):
     # Get current active visit
     visit = PatientVisit.objects.filter(
         patient=patient,
-        status="active"
-    ).first()
+        hospital=request.user.hospital,
+        is_active=True,
+    ).exclude(status="completed").first()
 
     # Automatically create an active visit if none exists
     if not visit:
         visit = PatientVisit.objects.create(
             patient=patient,
             hospital=request.user.hospital,
-            status="active",
+            assigned_doctor=request.user if request.user.role == "doctor" else None,
+            status="under_diagnosis",
+            is_active=True,
             is_emergency=request.POST.get("is_emergency") == "on"
         )
 
@@ -2545,9 +3013,9 @@ def delete_category(request, cat_id):
 
 @login_required
 def add_vital_sign(request, patient_id):
-    patient = get_object_or_404(Patient, id=patient_id)
+    patient = hospital_scoped_or_404(Patient, request.user, id=patient_id)
     if request.method == "POST":
-        visit = PatientVisit.objects.filter(patient=patient, status="active").first()
+        visit = PatientVisit.objects.filter(patient=patient, is_active=True).first()
 
         def parse_int(val):
             return int(val) if val is not None and str(val).strip() else None
@@ -2643,7 +3111,7 @@ def add_vital_sign(request, patient_id):
 
 @login_required
 def patient_vitals_graphs(request, patient_id):
-    patient = get_object_or_404(Patient, id=patient_id)
+    patient = hospital_scoped_or_404(Patient, request.user, id=patient_id)
 
     vitals = VitalSign.objects.filter(patient=patient).order_by("created_at")
 
@@ -2668,35 +3136,8 @@ def patient_vitals_graphs(request, patient_id):
 
 @login_required
 def nhis_claims_dashboard(request):
-    nhis = Payer.objects.filter(code="NHIS").first()
-    kschma = Payer.objects.filter(code="KSCHMA").first()
-
-    # Bills where the linked ThirdPartyPayer is a government scheme
-    government_bills = Bill.objects.filter(third_party__payer_type__in=["federal", "state"]) 
-
-    nhis_bills = government_bills.filter(patient__patientcoverage__payer=nhis)
-    kschma_bills = government_bills.filter(patient__patientcoverage__payer=kschma)
-
-    def bill_totals(qs):
-        return {
-            "total": qs.aggregate(t=Sum("third_party_payable"))["t"] or 0,
-            "paid": qs.filter(is_fully_paid=True).aggregate(p=Sum("third_party_payable"))["p"] or 0,
-            "unpaid": qs.filter(is_fully_paid=False).aggregate(u=Sum("third_party_payable"))["u"] or 0,
-        }
-
-    context = {
-        "nhis": bill_totals(nhis_bills),
-        "kschma": bill_totals(kschma_bills),
-        "nhis_bills": nhis_bills.order_by("-created_at"),
-        "kschma_bills": kschma_bills.order_by("-created_at"),
-    }
-
-    return render(request, "billing/accountant/nhis_claims_dashboard.html", context)
-    context = {
-        "nhis": bill_totals(nhis_bills),
-        "kschma": bill_totals(kschma_bills),
-        "nhis_bills": nhis_bills.order_by("-created_at"),
-        "kschma_bills": kschma_bills.order_by("-created_at"),
-    }
-
-    return render(request, "billing/accountant/nhis_claims_dashboard.html", context)
+    return render(
+        request,
+        "billing/accountant/nhis_claims_dashboard.html",
+        build_accountant_dashboard_context(request.user),
+    )

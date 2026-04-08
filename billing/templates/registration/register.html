@@ -6,30 +6,161 @@
 {% block content %}
 <div class="container mt-5">
   <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="col-lg-10">
       <div class="card shadow-sm">
         <div class="card-header bg-primary text-white">
-          <h4 class="mb-0">Create an Account</h4>
+          <h4 class="mb-0">Create Staff Account</h4>
         </div>
         <div class="card-body">
-          <form method="post" novalidate>
-            {% csrf_token %}
-            {% for field in form %}
-              <div class="mb-3">
-                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}
-                  <div class="form-text">{{ field.help_text }}</div>
-                {% endif %}
-                {% for error in field.errors %}
-                  <div class="text-danger small">{{ error }}</div>
-                {% endfor %}
-              </div>
+          {% if messages %}
+            {% for message in messages %}
+              <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
             {% endfor %}
-            <button type="submit" class="btn btn-primary w-100">Register</button>
-          </form>
-          <div class="text-center mt-3">
-            <a href="{% url 'login' %}">Already have an account? Login</a>
+          {% endif %}
+
+          <div class="row g-4">
+            <div class="col-lg-5">
+              <p class="text-muted">
+                New users created here will automatically belong to <strong>{{ hospital.name }}</strong>.
+              </p>
+
+              <form method="post" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                  <div class="alert alert-danger">
+                    {{ form.non_field_errors }}
+                  </div>
+                {% endif %}
+
+                <div class="mb-3">
+                  <label for="{{ form.first_name.id_for_label }}" class="form-label">First Name</label>
+                  {{ form.first_name }}
+                  {% for error in form.first_name.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                  {% endfor %}
+                </div>
+
+                <div class="mb-3">
+                  <label for="{{ form.last_name.id_for_label }}" class="form-label">Last Name</label>
+                  {{ form.last_name }}
+                  {% for error in form.last_name.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                  {% endfor %}
+                </div>
+
+                <div class="mb-3">
+                  <label for="{{ form.username.id_for_label }}" class="form-label">Username</label>
+                  {{ form.username }}
+                  {% for error in form.username.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                  {% endfor %}
+                </div>
+
+                <div class="mb-3">
+                  <label for="{{ form.email.id_for_label }}" class="form-label">Email</label>
+                  {{ form.email }}
+                  {% for error in form.email.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                  {% endfor %}
+                </div>
+
+                <div class="mb-3">
+                  <label for="{{ form.role.id_for_label }}" class="form-label">Role</label>
+                  {{ form.role }}
+                  {% if form.role.help_text %}
+                    <div class="form-text">{{ form.role.help_text }}</div>
+                  {% endif %}
+                  {% for error in form.role.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                  {% endfor %}
+                </div>
+
+                <div class="mb-3">
+                  <label for="{{ form.specialty.id_for_label }}" class="form-label">Specialty</label>
+                  {{ form.specialty }}
+                  {% if form.specialty.help_text %}
+                    <div class="form-text">{{ form.specialty.help_text }}</div>
+                  {% endif %}
+                  {% for error in form.specialty.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                  {% endfor %}
+                </div>
+
+                <div class="mb-3">
+                  <label for="{{ form.password1.id_for_label }}" class="form-label">Password</label>
+                  {{ form.password1 }}
+                  {% if form.password1.help_text %}
+                    <div class="form-text">{{ form.password1.help_text|safe }}</div>
+                  {% endif %}
+                  {% for error in form.password1.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                  {% endfor %}
+                </div>
+
+                <div class="mb-3">
+                  <label for="{{ form.password2.id_for_label }}" class="form-label">Confirm Password</label>
+                  {{ form.password2 }}
+                  {% for error in form.password2.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                  {% endfor %}
+                </div>
+
+                <div class="d-grid gap-2">
+                  <button type="submit" class="btn btn-primary">Create User</button>
+                  <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+                </div>
+              </form>
+            </div>
+
+            <div class="col-lg-7">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Current Hospital Staff</h5>
+                <span class="badge bg-secondary">{{ staff_users.count }} users</span>
+              </div>
+
+              <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                  <thead>
+                    <tr>
+                      <th>User</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for staff_user in staff_users %}
+                      <tr>
+                        <td>
+                          <div class="fw-semibold">{{ staff_user.username }}</div>
+                          {% if staff_user.first_name or staff_user.last_name %}
+                            <div class="text-muted small">{{ staff_user.first_name }} {{ staff_user.last_name }}</div>
+                          {% endif %}
+                          <div class="text-muted small">{{ staff_user.email|default:"-" }}</div>
+                        </td>
+                        <td>
+                          {{ staff_user.get_role_display }}
+                          {% if staff_user.specialty %}
+                            <div class="text-muted small">{{ staff_user.specialty }}</div>
+                          {% endif %}
+                        </td>
+                        <td>
+                          {% if staff_user.is_active %}
+                            <span class="badge bg-success">Active</span>
+                          {% else %}
+                            <span class="badge bg-secondary">Inactive</span>
+                          {% endif %}
+                        </td>
+                      </tr>
+                    {% empty %}
+                      <tr>
+                        <td colspan="3" class="text-center text-muted py-4">No staff users created yet.</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>

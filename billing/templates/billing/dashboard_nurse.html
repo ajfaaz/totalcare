@@ -1,118 +1,135 @@
-{% extends "base.html" %}
+{% extends "base_dashboard.html" %}
+
+{% block title %}Nurse Dashboard{% endblock %}
+
 {% block content %}
 
-<div class="container-fluid mt-4">
-  <h2 class="mb-4">👩‍⚕️ Nurse Dashboard</h2>
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+  <div>
+    <h2 class="fw-bold text-primary mb-1">
+      <i class="bi bi-heart-pulse me-2"></i>Nurse Dashboard
+    </h2>
+    <p class="text-muted mb-0">Monitor active visits and keep vital-sign capture moving.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'patient_list' %}" class="btn btn-outline-primary">All Patients</a>
+    <a href="{% url 'inbox' %}" class="btn btn-outline-secondary">Inbox</a>
+  </div>
+</div>
 
-  <!-- Quick Actions -->
-  <div class="row mb-4">
-    <div class="col-md-3">
-      <a href="{% url 'patient_list' %}" class="card shadow-sm text-decoration-none">
-        <div class="card-body text-center">
-          <h5>Record Vitals</h5>
-          <p class="text-muted">Add new vital signs</p>
-        </div>
-      </a>
-    </div>
-    <div class="col-md-3">
-      <a href="{% url 'patient_list' %}" class="card shadow-sm text-decoration-none">
-        <div class="card-body text-center">
-          <h5>All Patients</h5>
-          <p class="text-muted">Search / view</p>
-        </div>
-      </a>
-    </div>
-    <div class="col-md-3">
-      <a href="{% url 'inbox' %}" class="card shadow-sm text-decoration-none">
-        <div class="card-body text-center">
-          <h5>Messages</h5>
-          <p class="text-muted">Inbox ({{ unread_count }})</p>
-        </div>
-      </a>
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Active Visits</h6>
+        <div class="fs-3 fw-bold text-primary">{{ active_visits|length }}</div>
+      </div>
     </div>
   </div>
-
-  <!-- Active Patients -->
-  <div class="card shadow-sm mb-4">
-    <div class="card-header bg-primary text-white">
-      <h5 class="mb-0">Active Patient Visits</h5>
-    </div>
-    <div class="card-body">
-      {% if active_visits %}
-        <div class="table-responsive">
-          <table class="table table-striped">
-            <thead>
-              <tr>
-                <th>Patient</th>
-                <th>Reason</th>
-                <th>Doctor</th>
-                <th>Time In</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for v in active_visits %}
-                <tr>
-                  <td>{{ v.patient.full_name }}</td>
-                  <td>{{ v.reason|default:"-" }}</td>
-                  <td>{{ v.assigned_doctor.get_full_name|default:v.assigned_doctor.username }}</td>
-                  <td>{{ v.started_at|date:"M d, H:i" }}</td>
-                  <td>
-                    <a href="{% url 'add_vital_sign' v.patient.id %}" class="btn btn-sm btn-outline-primary">
-                      Record Vitals
-                    </a>
-                    <a href="{% url 'patient_emr' v.patient.id %}" class="btn btn-sm btn-outline-secondary">
-                      View EMR
-                    </a>
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% else %}
-        <p class="text-muted">No active patient visits.</p>
-      {% endif %}
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Recent Vitals</h6>
+        <div class="fs-3 fw-bold text-success">{{ recent_vitals|length }}</div>
+      </div>
     </div>
   </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Unread Messages</h6>
+        <div class="fs-3 fw-bold text-info">{{ unread_count }}</div>
+      </div>
+    </div>
+  </div>
+</div>
 
-  <!-- Recent Vitals -->
-  <div class="card shadow-sm">
-    <div class="card-header bg-success text-white">
-      <h5 class="mb-0">Recent Vital Signs</h5>
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="fw-bold mb-0">Active Patient Visits</h5>
+      <span class="badge bg-secondary">{{ active_visits|length }} active</span>
     </div>
-    <div class="card-body">
-      {% if recent_vitals %}
-        <div class="table-responsive">
-          <table class="table table-hover">
-            <thead>
+
+    {% if active_visits %}
+      <div class="table-responsive">
+        <table class="table table-striped align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Patient</th>
+              <th>Status</th>
+              <th>Doctor</th>
+              <th>Time In</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in active_visits %}
               <tr>
-                <th>Patient</th>
-                <th>BP</th>
-                <th>Pulse</th>
-                <th>Temp</th>
-                <th>SpO₂</th>
-                <th>Recorded At</th>
+                <td>{{ v.patient.full_name }}</td>
+                <td>{{ v.get_status_display }}</td>
+                <td>{{ v.assigned_doctor.full_name|default:"Unassigned" }}</td>
+                <td>{{ v.created_at|date:"M d, H:i" }}</td>
+                <td class="text-end">
+                  <a href="{% url 'add_vital_sign' v.patient.id %}" class="btn btn-sm btn-outline-primary">
+                    Record Vitals
+                  </a>
+                  <a href="{% url 'patient_emr' v.patient.id %}" class="btn btn-sm btn-outline-secondary">
+                    View EMR
+                  </a>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {% for v in recent_vitals %}
-                <tr>
-                  <td>{{ v.patient.full_name }}</td>
-                  <td>{{ v.blood_pressure_systolic|default:"-" }}/{{ v.blood_pressure_diastolic|default:"-" }}</td>
-                  <td>{{ v.heart_rate|default:"-" }}</td>
-                  <td>{{ v.temperature|default:"-" }}°C</td>
-                  <td>{{ v.spo2|default:"-" }}%</td>
-                  <td>{{ v.created_at|date:"M d, H:i" }}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% else %}
-        <p class="text-muted">No vitals recorded recently.</p>
-      {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light border mb-0">
+        No active patient visits.
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="fw-bold mb-0">Recent Vital Signs</h5>
+      <span class="badge bg-secondary">{{ recent_vitals|length }} recent entries</span>
     </div>
+
+    {% if recent_vitals %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Patient</th>
+              <th>BP</th>
+              <th>Pulse</th>
+              <th>Temp</th>
+              <th>SpO₂</th>
+              <th>Recorded At</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in recent_vitals %}
+              <tr>
+                <td>{{ v.patient.full_name }}</td>
+                <td>{{ v.blood_pressure_systolic|default:"-" }}/{{ v.blood_pressure_diastolic|default:"-" }}</td>
+                <td>{{ v.heart_rate|default:"-" }}</td>
+                <td>{{ v.temperature|default:"-" }}°C</td>
+                <td>{{ v.spo2|default:"-" }}%</td>
+                <td>{{ v.created_at|date:"M d, H:i" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light border mb-0">
+        No vitals recorded recently.
+      </div>
+    {% endif %}
   </div>
 </div>
 

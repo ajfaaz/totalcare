@@ -19,8 +19,14 @@
     {% for d in doctors %}
     <tr>
       <td>
-        <strong>{{ d.doctor.full_name }}</strong>
-        <br><small class="text-muted">{{ d.doctor.specialty }}</small>
+        <strong>
+          {% if d.doctor.get_full_name %}
+            {{ d.doctor.get_full_name }}
+          {% else %}
+            {{ d.doctor.username }}
+          {% endif %}
+        </strong>
+        <br><small class="text-muted">{{ d.doctor.specialty|default:"Unassigned" }}</small>
       </td>
       <td>{{ d.total_alerts }}</td>
       <td>{{ d.avg_ack_time }}</td>

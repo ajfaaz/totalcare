@@ -26,11 +26,17 @@
             <option value="">Select active visit</option>
             {% for visit in visits %}
             <option value="{{ visit.id }}">
-              {{ visit.visit_type }} — {{ visit.created_at|date:"M d, Y H:i" }}
+              {{ visit.get_status_display }} — {{ visit.created_at|date:"M d, Y H:i" }}
             </option>
             {% endfor %}
           </select>
         </div>
+
+        {% if not visits %}
+        <div class="alert alert-warning">
+          No active visit found for this patient yet. Check the patient in first before adding a doctor note.
+        </div>
+        {% endif %}
 
         <div class="mb-3">
           <label class="form-label fw-bold">Doctor Note</label>
@@ -39,7 +45,7 @@
 
         <div class="d-flex justify-content-end">
           <a href="{% url 'patient_emr' patient.id %}" class="btn btn-secondary me-2">Cancel</a>
-          <button class="btn btn-primary">
+          <button class="btn btn-primary" {% if not visits %}disabled{% endif %}>
             <i class="bi bi-save"></i> Save Note
           </button>
         </div>
