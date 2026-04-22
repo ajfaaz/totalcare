@@ -27,7 +27,8 @@ def env_bool(name, default=False):
 # SECURITY SETTINGS
 # =====================
 SECRET_KEY = config('SECRET_KEY', default='your-dev-secret-key')
-DEBUG = env_bool('DEBUG', default=True)
+# Default to False for safety in production. Enable locally via `.env` (DEBUG=True).
+DEBUG = env_bool('DEBUG', default=False)
 
 DEFAULT_ALLOWED_HOSTS = [
     '127.0.0.1',

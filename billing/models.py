@@ -72,6 +72,34 @@ class CustomUser(AbstractUser):
     def has_role(self, role_name):
         return self.role == role_name
 
+    # Convenience helpers used across views/templates (some code calls these as methods).
+    def is_platform_admin(self):
+        return self.role == "platform_admin"
+
+    def is_admin(self):
+        return self.role == "admin"
+
+    def is_receptionist(self):
+        return self.role == "receptionist"
+
+    def is_doctor(self):
+        return self.role == "doctor"
+
+    def is_nurse(self):
+        return self.role == "nurse"
+
+    def is_lab(self):
+        return self.role == "lab"
+
+    def is_radiologist(self):
+        return self.role == "radiologist"
+
+    def is_pharmacist(self):
+        return self.role == "pharmacist"
+
+    def is_accountant(self):
+        return self.role == "accountant"
+
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"
 
