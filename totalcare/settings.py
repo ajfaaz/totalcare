@@ -82,6 +82,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'totalcare.middleware.HospitalMiddleware',
     'totalcare.middleware.EnforceHospitalIsolationMiddleware',
+    'totalcare.middleware.SubscriptionMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -215,6 +216,10 @@ VITAL_ALERT_ESCALATION_RULES = {
     1: {"minutes": 10, "role": "head_doctor"},
     2: {"minutes": 20, "role": "admin"},
 }
+
+# Paystack Payment Settings
+PAYSTACK_PUBLIC_KEY = config('PAYSTACK_PUBLIC_KEY', default='pk_test_29269d6aab95e1500c090c1ff093b4dc56b6b526')
+PAYSTACK_SECRET_KEY = config('PAYSTACK_SECRET_KEY', default='sk_test_6709e765c70050a94bfd2d9bd4e9ed370e8fea86')
 
 # Allow cookies across all subdomains in production when explicitly set
 SESSION_COOKIE_DOMAIN = config('SESSION_COOKIE_DOMAIN', default=None)

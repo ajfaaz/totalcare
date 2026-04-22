@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 from django.utils import timezone
+from django.utils.text import slugify
 import uuid
 from datetime import timedelta
 
@@ -12,13 +13,28 @@ from datetime import timedelta
 
 class Hospital(models.Model):
     name = models.CharField(max_length=100)
-    slug = models.SlugField(unique=True)
+    slug = models.SlugField(unique=True, blank=True)
     logo = models.ImageField(upload_to="hospital_logos/", blank=True, null=True)
+    owner_email = models.EmailField()
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     # SLA POLICIES (minutes)
     sla_doctor_ack_minutes = models.PositiveIntegerField(default=5)
     sla_head_doctor_minutes = models.PositiveIntegerField(default=10)
     sla_admin_minutes = models.PositiveIntegerField(default=20)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_subscription_active(self):
+        try:
+            return self.subscription.is_active
+        except:
+            return False
 
     def __str__(self):
         return self.name
@@ -26,6 +42,7 @@ class Hospital(models.Model):
 
 class CustomUser(AbstractUser):
     USER_ROLE_CHOICES = [
+        ("platform_admin", "Platform Admin"),
         ("admin", "Hospital Admin"),
         ('receptionist', 'Receptionist'),
         ('doctor', 'Doctor'),
@@ -46,6 +63,15 @@ class CustomUser(AbstractUser):
     
     specialty = models.CharField(max_length=100, blank=True, null=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['hospital']),
+            models.Index(fields=['role']),
+        ]
+
+    def has_role(self, role_name):
+        return self.role == role_name
+
     def __str__(self):
         return f"{self.username} ({self.get_role_display()})"
 
@@ -55,30 +81,23 @@ class CustomUser(AbstractUser):
         return name or self.username
 
 
-    # ✅ Add these helper methods
-    def is_admin(self):
-        return self.role == "admin"
+class Subscription(models.Model):
+    PLAN_CHOICES = [
+        ("basic", "Basic"),
+        ("standard", "Standard"),
+        ("premium", "Premium"),
+    ]
 
-    def is_pharmacist(self):
-        return self.role == "pharmacist"
+    hospital = models.OneToOneField(Hospital, on_delete=models.CASCADE)
+    plan = models.CharField(max_length=20, choices=PLAN_CHOICES)
+    
+    start_date = models.DateField()
+    end_date = models.DateField()
 
-    def is_doctor(self):
-        return self.role == "doctor"
-        
-    def is_nurse(self):
-        return self.role == "nurse"
+    is_active = models.BooleanField(default=True)
 
-    def is_receptionist(self):
-        return self.role == "receptionist"
-
-    def is_lab(self):
-        return self.role == "lab"
-
-    def is_radiologist(self):
-        return self.role == "radiologist"
-
-    def is_accountant(self):
-        return self.role == "accountant"
+    def __str__(self):
+        return f"{self.hospital.name} - {self.plan}"
 
 
 class SLAPolicy(models.Model):
@@ -176,6 +195,7 @@ class PatientVisit(models.Model):
     # ✅ NEW FIELDS
     is_emergency = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
+    reason = models.CharField(max_length=200, blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -205,6 +225,24 @@ class Bill(models.Model):
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE)
     invoice_no = models.CharField(max_length=50, unique=True, default=uuid.uuid4)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    bill_type = models.CharField(
+        max_length=20,
+        choices=[
+            ("front_desk", "Front Desk"),
+            ("pharmacy", "Pharmacy"),
+        ],
+        default="front_desk",
+    )
+    is_finalized = models.BooleanField(default=False)
+    finalized_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_bills",
+        limit_choices_to={'role': 'accountant'},
+    )
 
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
 
@@ -262,12 +300,18 @@ class Bill(models.Model):
 
 class BillItem(models.Model):
     bill = models.ForeignKey(Bill, related_name='items', on_delete=models.CASCADE)
-    service = models.ForeignKey(Service, on_delete=models.CASCADE)
+    service = models.ForeignKey(Service, null=True, blank=True, on_delete=models.CASCADE)
+    medicine = models.ForeignKey('Medicine', null=True, blank=True, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
 
     def save(self, *args, **kwargs):
-        self.subtotal = self.service.price * self.quantity
+        if self.service:
+            self.subtotal = self.service.price * self.quantity
+        elif self.medicine:
+            self.subtotal = self.medicine.price * self.quantity
+        else:
+            raise ValueError("BillItem must reference a service or a medicine.")
         super().save(*args, **kwargs)
 
 

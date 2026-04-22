@@ -18,7 +18,7 @@
                     type="text"
                     name="q"
                     class="form-control"
-                    placeholder="Search patient by name..."
+                    placeholder="Search by name, phone number, or patient ID..."
                     value="{{ query }}"
                 >
                 <button class="btn btn-outline-secondary">Search</button>
@@ -62,10 +62,21 @@
                             </td>
                             <td class="text-end">
                                 <div class="d-flex justify-content-end gap-2 flex-wrap">
-                                    <a href="{% url 'patient_emr' patient.id %}" class="btn btn-outline-primary btn-sm">EMR</a>
-                                    <a href="{% url 'add_doctor_note' patient.id %}" class="btn btn-primary btn-sm">Note</a>
-                                    <a href="{% url 'add_prescription' patient.id %}" class="btn btn-secondary btn-sm">Rx</a>
-                                    <a href="{% url 'add_vital_sign' patient.id %}" class="btn btn-info btn-sm">Vitals</a>
+                                    {% if user.role == 'receptionist' %}
+                                        <a href="{% url 'check_patient' patient.id %}" class="btn btn-outline-secondary btn-sm">Check</a>
+                                        <a href="{% url 'create_bill' patient.id %}" class="btn btn-success btn-sm">Create Bill</a>
+                                    {% else %}
+                                        <a href="{% url 'patient_emr' patient.id %}" class="btn btn-outline-primary btn-sm">EMR</a>
+                                        <a href="{% url 'add_doctor_note' patient.id %}" class="btn btn-primary btn-sm">Note</a>
+                                        <a href="{% url 'add_prescription' patient.id %}" class="btn btn-secondary btn-sm">Rx</a>
+                                        <a href="{% url 'add_vital_sign' patient.id %}" class="btn btn-info btn-sm">Vitals</a>
+                                        {% if user.role == 'receptionist' or user.role == 'admin' %}
+                                            <a href="{% url 'create_bill' patient.id %}" class="btn btn-success btn-sm">Create Bill</a>
+                                        {% endif %}
+                                        {% if user.role == 'pharmacist' or user.role == 'admin' %}
+                                            <a href="{% url 'create_pharmacy_bill' patient.id %}" class="btn btn-warning btn-sm">Medicine Bill</a>
+                                        {% endif %}
+                                    {% endif %}
                                 </div>
                             </td>
                         </tr>

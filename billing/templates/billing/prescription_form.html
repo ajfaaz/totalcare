@@ -25,6 +25,15 @@
         <form method="POST">
             {% csrf_token %}
 
+            <!-- Reason for visit field -->
+            <div class="mb-4">
+                <label class="form-label fw-semibold">Reason for Visit</label>
+                {{ form.reason }}
+                {% if form.reason.errors %}
+                    <div class="text-danger">{{ form.reason.errors.0 }}</div>
+                {% endif %}
+            </div>
+
             <!-- =========================================
                  AUTOCOMPLETE MEDICINE FIELD
             ========================================== -->
@@ -55,17 +64,26 @@
             <div class="row">
                 <div class="col-md-4 mb-3">
                     <label class="form-label fw-semibold">Dosage</label>
-                    <input name="dosage" class="form-control form-control-lg" placeholder="e.g. 500mg / 3× daily">
+                    {{ form.dosage }}
+                    {% if form.dosage.errors %}
+                        <div class="text-danger">{{ form.dosage.errors.0 }}</div>
+                    {% endif %}
                 </div>
 
                 <div class="col-md-4 mb-3">
                     <label class="form-label fw-semibold">Duration</label>
-                    <input name="duration" class="form-control form-control-lg" placeholder="e.g. 5 days">
+                    {{ form.duration }}
+                    {% if form.duration.errors %}
+                        <div class="text-danger">{{ form.duration.errors.0 }}</div>
+                    {% endif %}
                 </div>
 
                 <div class="col-md-4 mb-3">
                     <label class="form-label fw-semibold">Instructions</label>
-                    <input name="instructions" class="form-control form-control-lg" placeholder="e.g. After meals">
+                    {{ form.instructions }}
+                    {% if form.instructions.errors %}
+                        <div class="text-danger">{{ form.instructions.errors.0 }}</div>
+                    {% endif %}
                 </div>
             </div>
 

@@ -6,6 +6,8 @@ __pycache__/
 db.sqlite3
 /media/
 /staticfiles/
+hospital_logos/
+radiology_scans/
 
 # Env
 .env
@@ -15,6 +17,8 @@ env/
 
 # cPanel junk
 .passenger_wsgi.py
+public/
+tmp/
 
 # Logs
 *.log

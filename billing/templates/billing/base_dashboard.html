@@ -74,7 +74,7 @@
 <!-- NAVBAR -->
 <nav class="navbar navbar-expand-lg navbar-dark fixed-top" style="background-color:#1f3c88;">
   <div class="container-fluid">
-    <a class="navbar-brand fw-bold" href="{% url 'dashboard' %}">
+    <a class="navbar-brand fw-bold" href="{% if user.role == 'platform_admin' %}{% url 'platform_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">
     <i class="bi bi-hospital me-2"></i> TotalCare</a>
     
     <div class="ms-auto">
@@ -101,9 +101,15 @@
     {% block sidebar %}
 
         <!-- COMMON -->
-        <a class="nav-link text-white" href="{% url 'dashboard' %}">
-            <i class="bi bi-speedometer2 me-2"></i> Dashboard
-        </a>
+        {% if user.role == 'platform_admin' %}
+            <a class="nav-link text-white" href="{% url 'platform_dashboard' %}">
+                <i class="bi bi-speedometer2 me-2"></i> Platform Dashboard
+            </a>
+        {% else %}
+            <a class="nav-link text-white" href="{% url 'dashboard' %}">
+                <i class="bi bi-speedometer2 me-2"></i> Dashboard
+            </a>
+        {% endif %}
 
         <a class="nav-link text-white" href="{% url 'inbox' %}">
             <i class="bi bi-envelope me-2"></i> Inbox

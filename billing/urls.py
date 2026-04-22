@@ -18,6 +18,14 @@ urlpatterns = [
     path('radiology-dashboard/', views.radiologist_dashboard, name='radiology_dashboard'),
     path('lab-dashboard/', views.lab_dashboard, name='lab_dashboard'),
     path("pharmacist/dashboard/", views.pharmacist_dashboard, name="pharmacist_dashboard"),
+    path('platform/', views.platform_dashboard, name='platform_dashboard'),
+    path('platform/hospitals/add/', views.create_hospital, name='create_hospital'),
+    path('platform/hospitals/<int:hospital_id>/', views.view_hospital, name='view_hospital'),
+    path('platform/hospitals/<int:hospital_id>/edit/', views.edit_hospital, name='edit_hospital'),
+    path('platform/payment/', views.payment_page, name='payment_page'),
+    path('verify-payment/<str:reference>/', views.verify_payment, name='verify_payment'),
+    path('payment-failed/', views.payment_failed, name='payment_failed'),
+    path('toggle-hospital/<int:hospital_id>/', views.toggle_hospital, name='toggle_hospital'),
     
     
     # Hospital
@@ -90,6 +98,11 @@ urlpatterns = [
         views.doctor_scorecard,
         name="doctor_sla_scorecard"
     ),
+    path(
+        "app/doctors/<int:doctor_id>/sla/",
+        views.doctor_scorecard,
+        name="doctor_scorecard"
+    ),
 
     path(
         "app/sla/departments/",
@@ -127,8 +140,10 @@ urlpatterns = [
 
     # Billing
     path('bills/', views.bill_list, name='bill_list'),
-    path('bills/create/', views.create_bill_index, name='create_bill'),
+    path('bills/create/', views.create_bill_index, name='create_bill_index'),
     path('bills/create/<int:patient_id>/', views.create_bill, name='create_bill'),
+    path('pharmacy/bills/create/<int:patient_id>/', views.create_pharmacy_bill, name='create_pharmacy_bill'),
+    path('patients/<int:patient_id>/check/', views.check_patient, name='check_patient'),
     path('bills/<int:bill_id>/invoice/', views.view_invoice, name='view_invoice'),
     path('bills/<int:bill_id>/invoice/pdf/', views.download_invoice_pdf, name='download_invoice_pdf'),
     path('bills/<int:bill_id>/payment/', views.record_payment, name='record_payment'),

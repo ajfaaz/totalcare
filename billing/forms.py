@@ -227,6 +227,12 @@ from django import forms
 from .models import Prescription
 
 class PrescriptionForm(forms.ModelForm):
+    reason = forms.CharField(
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Reason for visit (optional)"}),
+        help_text="Specify the reason for this visit if creating a new visit"
+    )
     class Meta:
         model = Prescription
         fields = ["medicines", "dosage", "duration", "instructions"]
@@ -261,6 +267,21 @@ class HospitalSLAForm(forms.ModelForm):
             "sla_head_doctor_minutes",
             "sla_admin_minutes",
         ]
+
+class HospitalCreateForm(forms.ModelForm):
+    class Meta:
+        model = Hospital
+        fields = [
+            "name",
+            "owner_email",
+            "logo",
+        ]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Hospital name"}),
+            "owner_email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "Owner email"}),
+            "logo": forms.ClearableFileInput(attrs={"class": "form-control"}),
+        }
+
 
 class SLAPolicyForm(forms.ModelForm):
     class Meta:

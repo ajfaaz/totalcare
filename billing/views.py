@@ -3,14 +3,16 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Q, Max
-from django.db.models.functions import TruncMonth
+from django.db.models import Sum, Q, Max, F, Count, Avg, Value
+from django.db.models.functions import TruncMonth, Concat
 from django.contrib.auth.forms import AuthenticationForm
 from django.http import HttpResponse, HttpResponseForbidden
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from django.template.loader import get_template
+from django.template.loader import get_template, render_to_string
+from django.conf import settings
 from .models import MedicineCategory
 from billing.utils.vitals import evaluate_vitals
 import json
@@ -31,6 +33,8 @@ from .forms import (
     LabReportForm,
     RadiologyReportForm,
     PatientRegistrationForm,
+    HospitalSLAForm,
+    HospitalCreateForm,
 )
 from .models import (
     Appointment,
@@ -47,6 +51,7 @@ from .models import (
     LabReport,
     RadiologyReport,
     VitalSign,
+    Medicine,
     VitalAlert,
     VitalAlertLog,
     SLAPolicy,
@@ -55,6 +60,7 @@ from .models import (
     Payer,
     LabTestRequest,
     RadiologyRequest,
+    Subscription,
     
 )
 from billing.utils.sla import sla_remaining_time, sla_timer_state
@@ -72,6 +78,36 @@ User = get_user_model()
 
 def hospital_scoped_or_404(model, user, **filters):
     return get_object_or_404(model, hospital=user.hospital, **filters)
+
+
+def user_can_view_bill(user, bill):
+    if user.role in ["admin", "accountant"]:
+        return True
+    if user.role == "receptionist" and bill.bill_type == "front_desk":
+        return True
+    if user.role == "pharmacist" and bill.bill_type == "pharmacy":
+        return True
+    return False
+
+
+def user_can_record_payment(user):
+    return user.role in ["accountant", "admin"]
+
+
+def user_can_create_front_desk_bill(user):
+    return user.role in ["receptionist", "admin"]
+
+
+def user_can_create_pharmacy_bill(user):
+    return user.role in ["pharmacist", "admin"]
+
+
+def platform_required(view_func):
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated or request.user.role != "platform_admin":
+            return redirect('login')
+        return view_func(request, *args, **kwargs)
+    return wrapper
 
 
 def ensure_active_visit_for_appointment(appointment, started_by):
@@ -108,6 +144,7 @@ def ensure_active_visit_for_appointment(appointment, started_by):
         status="pending",
         is_active=True,
         is_emergency=appointment.is_walk_in,
+        reason=appointment.reason,
     )
     return visit, True
 
@@ -231,6 +268,140 @@ def build_accountant_dashboard_context(user):
         "government_bill_count": government_bills.count(),
         "unread_count": Message.objects.filter(recipient=user, is_read=False).count(),
     }
+
+@platform_required
+def platform_dashboard(request):
+    hospitals = Hospital.objects.all().order_by('name')
+    total_hospitals = hospitals.count()
+    active_hospitals = hospitals.filter(is_active=True).count()
+    expired_hospitals = 0
+    revenue = 0
+
+    today = timezone.now().date()
+
+    for hospital in hospitals:
+        try:
+            subscription = hospital.subscription
+        except ObjectDoesNotExist:
+            subscription = None
+        hospital.subscription = subscription
+
+        if subscription and subscription.end_date < today:
+            expired_hospitals += 1
+
+        if subscription:
+            if subscription.plan == 'basic':
+                revenue += 10000
+            elif subscription.plan == 'standard':
+                revenue += 25000
+            elif subscription.plan == 'premium':
+                revenue += 50000
+
+    return render(request, 'platform/dashboard.html', {
+        'hospitals': hospitals,
+        'total_hospitals': total_hospitals,
+        'active_hospitals': active_hospitals,
+        'expired_hospitals': expired_hospitals,
+        'revenue': revenue,
+        'today': today,
+    })
+
+@platform_required
+def toggle_hospital(request, hospital_id):
+    hospital = get_object_or_404(Hospital, id=hospital_id)
+    hospital.is_active = not hospital.is_active
+    hospital.save()
+    return redirect('platform_dashboard')
+
+@platform_required
+def create_hospital(request):
+    if request.method == 'POST':
+        form = HospitalCreateForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            return redirect('platform_dashboard')
+    else:
+        form = HospitalCreateForm()
+
+    return render(request, 'platform/create_hospital.html', {'form': form})
+
+@platform_required
+def view_hospital(request, hospital_id):
+    hospital = get_object_or_404(Hospital, id=hospital_id)
+    try:
+        subscription = hospital.subscription
+    except ObjectDoesNotExist:
+        subscription = None
+
+    return render(request, 'platform/view_hospital.html', {
+        'hospital': hospital,
+        'subscription': subscription,
+    })
+
+@platform_required
+def edit_hospital(request, hospital_id):
+    hospital = get_object_or_404(Hospital, id=hospital_id)
+
+    if request.method == 'POST':
+        form = HospitalCreateForm(request.POST, request.FILES, instance=hospital)
+        if form.is_valid():
+            form.save()
+            return redirect('platform_dashboard')
+    else:
+        form = HospitalCreateForm(instance=hospital)
+
+    return render(request, 'platform/edit_hospital.html', {
+        'form': form,
+        'hospital': hospital,
+    })
+
+@platform_required
+def payment_page(request):
+    return render(request, 'platform/payment.html', {
+        'PAYSTACK_PUBLIC_KEY': settings.PAYSTACK_PUBLIC_KEY,
+    })
+
+@login_required
+def verify_payment(request, reference):
+    import requests
+    from django.conf import settings
+
+    url = f"https://api.paystack.co/transaction/verify/{reference}"
+
+    headers = {
+        "Authorization": f"Bearer {settings.PAYSTACK_SECRET_KEY}",
+    }
+
+    response = requests.get(url, headers=headers)
+    data = response.json()
+
+    if data['status'] and data['data']['status'] == 'success':
+        # Get hospital via user
+        user = request.user
+        hospital = user.hospital
+
+        # Activate subscription
+        from datetime import date, timedelta
+
+        Subscription.objects.update_or_create(
+            hospital=hospital,
+            defaults={
+                'plan': 'standard',
+                'start_date': date.today(),
+                'end_date': date.today() + timedelta(days=30),
+                'is_active': True
+            }
+        )
+
+        messages.success(request, "Payment successful! Your subscription has been activated.")
+        return redirect('dashboard')
+
+    messages.error(request, "Payment verification failed. Please contact support.")
+    return redirect('payment_failed')
+
+@login_required
+def payment_failed(request):
+    return render(request, 'platform/payment_failed.html')
 
 # =======================================================
 # DASHBOARD
@@ -387,7 +558,11 @@ def dashboard(request):
         ).distinct()
 
         if query:
-            patients = patients.filter(full_name__icontains=query)
+            patients = patients.filter(
+                Q(full_name__icontains=query) |
+                Q(phone_number__icontains=query) |
+                Q(id__iexact=query)
+            )
 
         active_visits = PatientVisit.objects.filter(
             hospital=hospital,
@@ -432,7 +607,12 @@ def dashboard(request):
     # ==============================
     if user.role == "admin":
         return admin_dashboard(request)
-    
+
+    # ==============================
+    # PLATFORM ADMIN DASHBOARD
+    # ==============================
+    if user.role == "platform_admin":
+        return platform_dashboard(request)
 
     # ==============================
     # OTHER ROLES (fallback)
@@ -458,6 +638,7 @@ def home(request):
 @login_required
 def redirect_by_role(request):
     role_redirects = {
+        "platform_admin": "platform_dashboard",
         "admin": "admin_dashboard",
         "doctor": "doctor_dashboard",
         "receptionist": "receptionist_dashboard",
@@ -474,11 +655,17 @@ def redirect_by_role(request):
 # =======================================================
 
 @login_required
+@login_required
 def patient_list(request):
     query = request.GET.get("q", "")
     patients = Patient.objects.filter(hospital=request.user.hospital).order_by("full_name")
     if query:
-        patients = patients.filter(full_name__icontains=query)
+        # Search by name, phone number, or patient ID
+        patients = patients.filter(
+            Q(full_name__icontains=query) |
+            Q(phone_number__icontains=query) |
+            Q(id__iexact=query)
+        )
     active_visit_patient_ids = set(
         PatientVisit.objects.filter(
             hospital=request.user.hospital,
@@ -491,13 +678,30 @@ def patient_list(request):
 
 
 @login_required
-def patient_detail(request, patient_id):
-    """Simple patient detail endpoint — redirect to the EMR page.
-
-    Kept lightweight to avoid adding a new template; callers expecting
-    a patient detail page will be forwarded to the EMR view.
-    """
+def check_patient(request, patient_id):
     patient = hospital_scoped_or_404(Patient, request.user, id=patient_id)
+    if not request.user.is_receptionist() and not request.user.is_admin():
+        return redirect("patient_emr", patient_id=patient.id)
+
+    active_visit = PatientVisit.objects.filter(
+        patient=patient,
+        hospital=request.user.hospital,
+        is_active=True,
+    ).exclude(status="completed").first()
+
+    return render(
+        request,
+        "billing/check_patient.html",
+        {"patient": patient, "active_visit": active_visit},
+    )
+
+
+@login_required
+def patient_detail(request, patient_id):
+    """Simple patient detail endpoint — redirect based on role."""
+    patient = hospital_scoped_or_404(Patient, request.user, id=patient_id)
+    if request.user.is_receptionist():
+        return redirect("check_patient", patient_id=patient.id)
     return redirect("patient_emr", patient_id=patient.id)
 
 
@@ -585,7 +789,10 @@ def appointment_list(request):
     appointments = Appointment.objects.filter(hospital=hospital)
     if query:
         appointments = appointments.filter(
-            Q(patient__full_name__icontains=query) | Q(reason__icontains=query)
+            Q(patient__full_name__icontains=query) |
+            Q(patient__phone_number__icontains=query) |
+            Q(patient__id__iexact=query) |
+            Q(reason__icontains=query)
         )
     appointments = appointments.select_related("patient", "doctor").order_by("-date", "-time")
     return render(request, "billing/appointment_list.html", {"appointments": appointments, "query": query})
@@ -655,16 +862,32 @@ def create_appointment(request):
 @login_required
 def bill_list(request):
     hospital = request.user.hospital
-    bills = Bill.objects.filter(hospital=hospital).select_related('patient').order_by('-created_at')
+    if request.user.role in ["accountant", "admin"]:
+        bills = Bill.objects.filter(hospital=hospital)
+    elif request.user.role == "receptionist":
+        bills = Bill.objects.filter(hospital=hospital, bill_type="front_desk", created_by=request.user)
+    elif request.user.role == "pharmacist":
+        bills = Bill.objects.filter(hospital=hospital, bill_type="pharmacy", created_by=request.user)
+    else:
+        bills = Bill.objects.none()
+
+    bills = bills.select_related('patient').order_by('-created_at')
     return render(request, "billing/bill_list.html", {"bills": bills})
 
 @login_required
 def create_bill_index(request):
-    messages.info(request, "Please select a patient to create a bill.")
+    if not user_can_create_front_desk_bill(request.user):
+        messages.error(request, "Only receptionists and administrators may create front desk bills.")
+        return redirect("dashboard")
+    messages.info(request, "Please select a patient to create a front desk bill.")
     return redirect("patient_list")
 
 @login_required
 def create_bill(request, patient_id):
+    if not user_can_create_front_desk_bill(request.user):
+        messages.error(request, "Only receptionists and administrators may create front desk bills.")
+        return redirect("dashboard")
+
     patient = hospital_scoped_or_404(Patient, request.user, id=patient_id)
     services = Service.objects.filter(hospital=patient.hospital)
     # include patient coverage info in template context
@@ -673,14 +896,19 @@ def create_bill(request, patient_id):
     if request.method == "POST":
         items_data, total = [], 0
         service_ids = request.POST.getlist("service")
-        quantities = request.POST.getlist("quantity")
 
-        for i in range(len(service_ids)):
-            service = get_object_or_404(Service, id=service_ids[i], hospital=patient.hospital)
-            qty = int(quantities[i])
+        for service_id in service_ids:
+            service = get_object_or_404(Service, id=service_id, hospital=patient.hospital)
+            qty = int(request.POST.get(f"quantity_{service_id}", 1))
+            if qty <= 0:
+                qty = 1
             subtotal = service.price * qty
             total += subtotal
             items_data.append({"service": service, "quantity": qty, "subtotal": subtotal})
+
+        if not items_data:
+            messages.error(request, "Please select at least one service before generating a bill.")
+            return render(request, "billing/create_bill.html", {"patient": patient, "services": services, "coverage": coverage})
 
         patient_payable, third_party_payable, third_party = calculate_bill_split(patient, total)
 
@@ -692,11 +920,17 @@ def create_bill(request, patient_id):
             patient_payable=patient_payable,
             third_party_payable=third_party_payable,
             third_party=third_party,
+            bill_type="front_desk",
         )
-        log_action(request.user, "create", "Bill", bill.id, f"Created bill of ${total} for {patient}")
+        log_action(request.user, "create", "Bill", bill.id, f"Created bill of {total} for {patient}")
 
         for item in items_data:
-            BillItem.objects.create(bill=bill, service=item["service"], quantity=item["quantity"], subtotal=item["subtotal"])
+            BillItem.objects.create(
+                bill=bill,
+                service=item["service"],
+                quantity=item["quantity"],
+                subtotal=item["subtotal"],
+            )
 
         return redirect("view_invoice", bill_id=bill.id)
 
@@ -712,8 +946,70 @@ def create_bill(request, patient_id):
 
 
 @login_required
+def create_pharmacy_bill(request, patient_id):
+    if not user_can_create_pharmacy_bill(request.user):
+        messages.error(request, "Only pharmacists and administrators may create pharmacy bills.")
+        return redirect("dashboard")
+
+    patient = hospital_scoped_or_404(Patient, request.user, id=patient_id)
+    medicines = Medicine.objects.filter(hospital=patient.hospital)
+    coverage = getattr(patient, "patientcoverage", None)
+
+    if request.method == "POST":
+        items_data, total = [], 0
+        medicine_ids = request.POST.getlist("medicine")
+
+        for medicine_id in medicine_ids:
+            medicine = get_object_or_404(Medicine, id=medicine_id, hospital=patient.hospital)
+            qty = int(request.POST.get(f"quantity_{medicine_id}", 1))
+            if qty <= 0:
+                qty = 1
+            subtotal = medicine.price * qty
+            total += subtotal
+            items_data.append({"medicine": medicine, "quantity": qty, "subtotal": subtotal})
+
+        if not items_data:
+            messages.error(request, "Please select at least one medicine before generating a pharmacy bill.")
+            return render(request, "billing/create_pharmacy_bill.html", {"patient": patient, "medicines": medicines, "coverage": coverage})
+
+        patient_payable, third_party_payable, third_party = calculate_bill_split(patient, total)
+
+        bill = Bill.objects.create(
+            patient=patient,
+            total_amount=total,
+            created_by=request.user,
+            hospital=patient.hospital,
+            patient_payable=patient_payable,
+            third_party_payable=third_party_payable,
+            third_party=third_party,
+            bill_type="pharmacy",
+        )
+        log_action(request.user, "create", "Bill", bill.id, f"Created pharmacy bill of {total} for {patient}")
+
+        for item in items_data:
+            BillItem.objects.create(
+                bill=bill,
+                medicine=item["medicine"],
+                quantity=item["quantity"],
+                subtotal=item["subtotal"],
+            )
+
+        return redirect("view_invoice", bill_id=bill.id)
+
+    return render(request, "billing/create_pharmacy_bill.html", {
+        "patient": patient,
+        "medicines": medicines,
+        "coverage": coverage,
+    })
+
+
+@login_required
 def view_invoice(request, bill_id):
     bill = hospital_scoped_or_404(Bill, request.user, id=bill_id)
+    if not user_can_view_bill(request.user, bill):
+        messages.error(request, "Unauthorized access to this invoice.")
+        return redirect("dashboard")
+
     items = bill.items.all()
     payments = bill.payment_set.all()
     paid = sum(p.amount_paid for p in payments)
@@ -728,6 +1024,10 @@ def view_invoice(request, bill_id):
 @login_required
 def download_invoice_pdf(request, bill_id):
     bill = hospital_scoped_or_404(Bill, request.user, id=bill_id)
+    if not user_can_view_bill(request.user, bill):
+        messages.error(request, "Unauthorized access to this invoice.")
+        return redirect("dashboard")
+
     items = bill.items.all()
     payments = bill.payment_set.all()
     paid = sum(p.amount_paid for p in payments)
@@ -751,6 +1051,10 @@ def download_invoice_pdf(request, bill_id):
 @login_required
 def record_payment(request, bill_id):
     bill = hospital_scoped_or_404(Bill, request.user, id=bill_id)
+    if not user_can_record_payment(request.user):
+        messages.error(request, "Only accountants and administrators may record final payments.")
+        return redirect("dashboard")
+
     if request.method == "POST":
         amount = request.POST.get("amount")
         payment_method = request.POST.get("payment_method")
@@ -765,6 +1069,9 @@ def record_payment(request, bill_id):
         total_paid = bill.payment_set.aggregate(total=Sum('amount_paid'))['total'] or 0
         if total_paid >= bill.patient_payable:
             bill.is_fully_paid = True
+            bill.is_finalized = True
+            bill.finalized_at = timezone.now()
+            bill.approved_by = request.user
             bill.save()
 
         messages.success(request, "Payment recorded successfully.")
@@ -1582,6 +1889,11 @@ def upload_radiology_result(request, request_id):
         radiology.radiologist = request.user
         radiology.save()
 
+        # Update visit status to radiology_completed
+        radiology.visit.status = "radiology_completed"
+        radiology.visit.save()
+
+        messages.success(request, "Radiology report uploaded successfully.")
         return redirect("dashboard")
 
     return render(request, "billing/upload_radiology.html", {
@@ -1963,7 +2275,7 @@ def doctor_sla_trend(request, doctor_id=None):
         messages.error(request, "Unauthorized access")
         return redirect("dashboard")
     
-    alerts = VitalAlert.objects.filter(hospital=request.user.hospital)
+    alerts = VitalAlert.objects.filter(patient__hospital=request.user.hospital)
     if doctor_id:
         alerts = alerts.filter(doctor_id=doctor_id)
     
@@ -2374,35 +2686,43 @@ def add_prescription(request, patient_id):
 
     # Automatically create an active visit if none exists
     if not visit:
+        reason = request.POST.get("reason") or "Prescription visit"
         visit = PatientVisit.objects.create(
             patient=patient,
             hospital=request.user.hospital,
             assigned_doctor=request.user if request.user.role == "doctor" else None,
             status="under_diagnosis",
             is_active=True,
-            is_emergency=request.POST.get("is_emergency") == "on"
+            is_emergency=request.POST.get("is_emergency") == "on",
+            reason=reason
         )
 
     if request.method == "POST":
-        medicines = request.POST.get("medicines")
-        dosage = request.POST.get("dosage") or "N/A"
-        duration = request.POST.get("duration") or "N/A"
-        instructions = request.POST.get("instructions") or "No special instructions"
+        form = PrescriptionForm(request.POST)
+        if form.is_valid():
+            medicines = form.cleaned_data["medicines"]
+            dosage = form.cleaned_data["dosage"] or "N/A"
+            duration = form.cleaned_data["duration"] or "N/A"
+            instructions = form.cleaned_data["instructions"] or "No special instructions"
 
-        prescription = Prescription.objects.create(
-            hospital=request.user.hospital,
-            visit=visit,
-            doctor=request.user,             # this is fine if Prescription model has doctor field
-            medicines=medicines,
-            dosage=dosage,
-            duration=duration,
-            instructions=instructions,
-        )
+            prescription = Prescription.objects.create(
+                hospital=request.user.hospital,
+                visit=visit,
+                doctor=request.user,             # this is fine if Prescription model has doctor field
+                medicines=medicines,
+                dosage=dosage,
+                duration=duration,
+                instructions=instructions,
+            )
 
-        messages.success(request, "Prescription added successfully.")
-        return redirect("patient_emr", patient_id=patient.id)
+            messages.success(request, "Prescription added successfully.")
+            return redirect("patient_emr", patient_id=patient.id)
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = PrescriptionForm()
 
-    return render(request, "billing/prescription_form.html", {"patient": patient})
+    return render(request, "billing/prescription_form.html", {"patient": patient, "form": form})
 
 # Pharmacist sees pending prescriptions
 @login_required

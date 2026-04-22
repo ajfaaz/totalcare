@@ -1,0 +1,149 @@
+{% extends 'billing/base.html' %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+
+    <!-- HEADER -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Platform Admin Dashboard</h2>
+            <p class="text-muted mb-0">Manage hospitals and subscriptions.</p>
+        </div>
+        <div class="d-grid gap-2 d-sm-flex">
+            <a href="{% url 'payment_page' %}" class="btn btn-success">
+                <i class="fas fa-credit-card"></i> Subscribe
+            </a>
+            <a href="{% url 'create_hospital' %}" class="btn btn-primary">
+                + Add Hospital
+            </a>
+        </div>
+    </div>
+
+    <!-- STATS CARDS -->
+    <div class="row">
+
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0 p-3">
+                <h6>Total Hospitals</h6>
+                <h3>{{ total_hospitals }}</h3>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0 p-3">
+                <h6>Active Hospitals</h6>
+                <h3 class="text-success">{{ active_hospitals }}</h3>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0 p-3">
+                <h6>Expired Subscriptions</h6>
+                <h3 class="text-danger">{{ expired_hospitals }}</h3>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0 p-3">
+                <h6>Revenue (Mock)</h6>
+                <h3>₦{{ revenue }}</h3>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- HOSPITAL TABLE -->
+    <div class="card shadow-sm mt-4">
+        <div class="card-body">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-3">
+                <h5 class="mb-0">Hospitals</h5>
+                <span class="text-muted small">{{ hospitals|length }} total</span>
+            </div>
+
+            <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Logo</th>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th>Subscription</th>
+                        <th>Expiry</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for hospital in hospitals %}
+                    <tr>
+                        <td>
+                            {% if hospital.logo %}
+                                <img src="{{ hospital.logo.url }}" width="40" height="40" class="rounded object-fit-cover" alt="{{ hospital.name }} logo">
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+
+                        <td>{{ hospital.name }}</td>
+
+                        <td>
+                            {% if hospital.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-danger">Disabled</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if hospital.subscription %}
+                                {% if hospital.subscription.end_date < today %}
+                                    <span class="badge bg-danger">{{ hospital.subscription.plan|capfirst }} - Expired</span>
+                                {% elif hospital.subscription.is_active %}
+                                    <span class="badge bg-success">{{ hospital.subscription.plan|capfirst }} - Active</span>
+                                {% else %}
+                                    <span class="badge bg-warning">{{ hospital.subscription.plan|capfirst }} - Pending</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge bg-secondary">No subscription</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if hospital.subscription and hospital.subscription.end_date %}
+                                {{ hospital.subscription.end_date|date:'M d, Y' }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <div class="d-grid gap-2 d-md-flex">
+                                <a href="{% url 'view_hospital' hospital.id %}" class="btn btn-sm btn-info">View</a>
+                                <a href="{% url 'edit_hospital' hospital.id %}" class="btn btn-sm btn-warning">Edit</a>
+
+                                {% if hospital.is_active %}
+                                    <a href="{% url 'toggle_hospital' hospital.id %}" class="btn btn-sm btn-danger">
+                                        Disable
+                                    </a>
+                                {% else %}
+                                    <a href="{% url 'toggle_hospital' hospital.id %}" class="btn btn-sm btn-success">
+                                        Activate
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">No hospitals yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

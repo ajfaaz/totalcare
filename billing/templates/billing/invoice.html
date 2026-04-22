@@ -8,6 +8,14 @@
       <h4>Invoice #{{ bill.invoice_no }}</h4>
       <p>Patient: {{ bill.patient.full_name }}</p>
       <p>Date: {{ bill.created_at }}</p>
+      <p>Type: {{ bill.get_bill_type_display }}</p>
+      <p>Status: {% if bill.is_finalized %}Finalized{% else %}Draft{% endif %}</p>
+      {% if bill.finalized_at %}
+      <p>Finalized: {{ bill.finalized_at }}</p>
+      {% endif %}
+      {% if bill.approved_by %}
+      <p>Approved by: {{ bill.approved_by.full_name }}</p>
+      {% endif %}
     </div>
     <div class="card-body">
 
@@ -23,9 +31,15 @@
         <tbody>
           {% for item in items %}
           <tr>
-            <td>{{ item.service.name }}</td>
+            <td>
+              {% if item.service %}
+                {{ item.service.name }}
+              {% else %}
+                {{ item.medicine.name }}
+              {% endif %}
+            </td>
             <td>{{ item.quantity }}</td>
-            <td>${{ item.subtotal }}</td>
+            <td>₦{{ item.subtotal }}</td>
           </tr>
           {% endfor %}
         </tbody>
