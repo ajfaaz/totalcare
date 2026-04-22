@@ -67,6 +67,10 @@
     }
 </style>
 
+    <!-- Project CSS -->
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/tc-responsive.css' %}">
+
     {% block head_scripts %}{% endblock %}
 </head>
 <body>
@@ -76,11 +80,18 @@
   <div class="container-fluid">
     <a class="navbar-brand fw-bold" href="{% if user.role == 'platform_admin' %}{% url 'platform_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">
     <i class="bi bi-hospital me-2"></i> TotalCare</a>
+
+    <!-- Mobile: open the sidebar as an offcanvas menu -->
+    <button class="btn btn-outline-light btn-sm d-md-none" type="button"
+            data-bs-toggle="offcanvas" data-bs-target="#tcSidebarOffcanvas"
+            aria-controls="tcSidebarOffcanvas" aria-label="Open menu">
+      <i class="bi bi-list"></i>
+    </button>
     
     <div class="ms-auto">
       {% if user.is_authenticated %}
         <div class="d-flex align-items-center gap-3">
-          <div class="text-end text-white small">
+          <div class="text-end text-white small tc-user-meta">
             <div class="fw-semibold">{{ user.full_name }}</div>
             <div class="opacity-75">{{ user.get_role_display }}{% if user.hospital %} • {{ user.hospital.name }}{% endif %}</div>
           </div>
@@ -96,73 +107,26 @@
   </div>
 </nav>
 
+<!-- MOBILE OFFCANVAS SIDEBAR -->
+<div class="offcanvas offcanvas-start d-md-none" tabindex="-1" id="tcSidebarOffcanvas"
+     aria-labelledby="tcSidebarOffcanvasLabel" style="background-color:#162447;">
+  <div class="offcanvas-header text-white">
+    <h5 class="offcanvas-title" id="tcSidebarOffcanvasLabel">
+      <i class="bi bi-hospital me-2"></i> Menu
+    </h5>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body p-0">
+    <div class="p-2">
+      {% include 'billing/_sidebar_links.html' %}
+    </div>
+  </div>
+</div>
+
 <!-- SIDEBAR -->
 <nav class="col-md-2 d-none d-md-block sidebar" style="background-color:#162447;">
     {% block sidebar %}
-
-        <!-- COMMON -->
-        {% if user.role == 'platform_admin' %}
-            <a class="nav-link text-white" href="{% url 'platform_dashboard' %}">
-                <i class="bi bi-speedometer2 me-2"></i> Platform Dashboard
-            </a>
-        {% else %}
-            <a class="nav-link text-white" href="{% url 'dashboard' %}">
-                <i class="bi bi-speedometer2 me-2"></i> Dashboard
-            </a>
-        {% endif %}
-
-        <a class="nav-link text-white" href="{% url 'inbox' %}">
-            <i class="bi bi-envelope me-2"></i> Inbox
-        </a>
-
-        <!-- PHARMACIST -->
-        {% if user.role == "pharmacist" %}
-            <hr>
-            <a class="nav-link text-white" href="{% url 'pharmacist_dashboard' %}">
-                <i class="bi bi-speedometer me-2"></i> Pharmacist Dashboard
-            </a>
-
-            <a class="nav-link text-white" href="{% url 'medicine_list' %}">
-                <i class="bi bi-capsule me-2"></i> Medicine Inventory
-            </a>
-
-            <a class="nav-link text-white" href="{% url 'add_medicine' %}">
-                <i class="bi bi-plus-circle me-2"></i> Add Medicine
-            </a>
-
-            <a class="nav-link text-white" href="{% url 'pharmacist_prescriptions' %}">
-                <i class="bi bi-prescription me-2"></i> Pending Prescriptions
-            </a>
-
-            <a class="nav-link text-white" href="{% url 'dispense_history' %}">
-                <i class="bi bi-clock-history me-2"></i> Dispense History
-            </a>
-            
-            <a class="nav-link text-white" href="{% url 'category_list' %}">
-                <i class="bi bi-tags me-2"></i> Medicine Categories
-            </a>
-
-        {% endif %}
-
-        <!-- DOCTOR -->
-        {% if user.role == "doctor" %}
-            <hr>
-            <a class="nav-link text-white" href="{% url 'patient_list' %}">
-                <i class="bi bi-people me-2"></i> Patients
-            </a>
-
-            <a class="nav-link text-white" href="{% url 'doctor_prescriptions' %}">
-                <i class="bi bi-journal-medical me-2"></i> My Prescriptions
-            </a>
-
-            <a class="nav-link text-white" href="{% url 'doctor_alert_dashboard' %}">
-                <i class="bi bi-exclamation-triangle me-2"></i> Vital Alerts
-            </a>
-
-            <a class="nav-link text-white" href="#">
-                <i class="bi bi-activity me-2"></i> Performance Stats
-            </a>
-        {% endif %}
+        {% include 'billing/_sidebar_links.html' %}
 
     {% endblock %}
 </nav>
@@ -170,8 +134,7 @@
 <!-- MESSAGES -->
 {% if messages %}
     {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} alert-dismissible fade show m-3"
-             style="margin-left:260px;">
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show m-3 tc-flash">
             {{ message }}
             <button class="btn-close" data-bs-dismiss="alert"></button>
         </div>

@@ -1,0 +1,65 @@
+{# Shared sidebar links used in both desktop sidebar and mobile offcanvas. #}
+
+<!-- COMMON -->
+{% if user.role == 'platform_admin' %}
+  <a class="nav-link text-white" href="{% url 'platform_dashboard' %}">
+    <i class="bi bi-speedometer2 me-2"></i> Platform Dashboard
+  </a>
+{% else %}
+  <a class="nav-link text-white" href="{% url 'dashboard' %}">
+    <i class="bi bi-speedometer2 me-2"></i> Dashboard
+  </a>
+{% endif %}
+
+<a class="nav-link text-white" href="{% url 'inbox' %}">
+  <i class="bi bi-envelope me-2"></i> Inbox
+</a>
+
+<!-- PHARMACIST -->
+{% if user.role == "pharmacist" %}
+  <hr class="border-secondary opacity-50">
+  <a class="nav-link text-white" href="{% url 'pharmacist_dashboard' %}">
+    <i class="bi bi-speedometer me-2"></i> Pharmacist Dashboard
+  </a>
+
+  <a class="nav-link text-white" href="{% url 'medicine_list' %}">
+    <i class="bi bi-capsule me-2"></i> Medicine Inventory
+  </a>
+
+  <a class="nav-link text-white" href="{% url 'add_medicine' %}">
+    <i class="bi bi-plus-circle me-2"></i> Add Medicine
+  </a>
+
+  <a class="nav-link text-white" href="{% url 'pharmacist_prescriptions' %}">
+    <i class="bi bi-prescription me-2"></i> Pending Prescriptions
+  </a>
+
+  <a class="nav-link text-white" href="{% url 'dispense_history' %}">
+    <i class="bi bi-clock-history me-2"></i> Dispense History
+  </a>
+
+  <a class="nav-link text-white" href="{% url 'category_list' %}">
+    <i class="bi bi-tags me-2"></i> Medicine Categories
+  </a>
+{% endif %}
+
+<!-- DOCTOR -->
+{% if user.role == "doctor" %}
+  <hr class="border-secondary opacity-50">
+  <a class="nav-link text-white" href="{% url 'patient_list' %}">
+    <i class="bi bi-people me-2"></i> Patients
+  </a>
+
+  <a class="nav-link text-white" href="{% url 'doctor_prescriptions' %}">
+    <i class="bi bi-journal-medical me-2"></i> My Prescriptions
+  </a>
+
+  <a class="nav-link text-white" href="{% url 'doctor_alert_dashboard' %}">
+    <i class="bi bi-exclamation-triangle me-2"></i> Vital Alerts
+  </a>
+
+  <a class="nav-link text-white" href="#">
+    <i class="bi bi-activity me-2"></i> Performance Stats
+  </a>
+{% endif %}
+
