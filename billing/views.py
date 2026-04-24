@@ -497,6 +497,33 @@ def dashboard(request):
             "pending_reports": pending_scans.count(),
             "completed_today": completed_today
         })
+
+    # ==============================
+    # PHARMACIST DASHBOARD
+    # ==============================
+    if user.role == "pharmacist":
+        today = timezone.localdate()
+        prescriptions = (
+            Prescription.objects.filter(status="issued", hospital=hospital)
+            .select_related("visit__patient", "doctor")
+            .order_by("-issued_at")
+        )
+
+        today_dispensed = Prescription.objects.filter(
+            status="dispensed",
+            hospital=hospital,
+            dispensed_at__date=today,
+        ).count()
+
+        return render(
+            request,
+            "billing/pharmacist_dashboard.html",
+            {
+                **base_context,
+                "prescriptions": prescriptions,
+                "today_dispensed": today_dispensed,
+            },
+        )
     
     # ==============================
     # RECEPTIONIST DASHBOARD
@@ -2642,23 +2669,26 @@ def lab_dashboard(request):
 @login_required
 def pharmacist_dashboard(request):
     hospital = request.user.hospital
-    prescriptions = Prescription.objects.filter(status='issued', hospital=hospital).order_by('-issued_at')
+    today = timezone.localdate()
+    prescriptions = (
+        Prescription.objects.filter(status="issued", hospital=hospital)
+        .select_related("visit__patient", "doctor")
+        .order_by("-issued_at")
+    )
 
-    # Daily Dispense Count
-    today = timezone.now().date()
-    daily_dispensed_count = Prescription.objects.filter(
-        status='dispensed',
+    today_dispensed = Prescription.objects.filter(
+        status="dispensed",
         hospital=hospital,
-        dispensed_at__date=today
+        dispensed_at__date=today,
     ).count()
 
-    print("Pharmacist Dashboard → Found prescriptions:", prescriptions.count())  # debug log
-    for p in prescriptions:
-        print(f"→ {p.id}: {p.medicines} ({p.status})")
+    # Keep parity with the main /dashboard/ context so templates are consistent.
+    unread_count = Message.objects.filter(recipient=request.user, is_read=False).count()
 
     context = {
         "prescriptions": prescriptions,
-        "daily_dispensed_count": daily_dispensed_count,
+        "today_dispensed": today_dispensed,
+        "unread_count": unread_count,
     }
     return render(request, "billing/pharmacist_dashboard.html", context)
 
