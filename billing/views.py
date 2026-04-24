@@ -35,6 +35,7 @@ from .forms import (
     PatientRegistrationForm,
     HospitalSLAForm,
     HospitalCreateForm,
+    ServiceForm,
 )
 from .models import (
     Appointment,
@@ -2636,6 +2637,86 @@ def reset_staff_password(request, user_id):
             "password_form": password_form,
         },
     )
+
+
+@login_required
+def manage_services(request):
+    """Hospital admin can manage billable services and pricing for their hospital."""
+    if request.user.role != "admin":
+        messages.error(request, "Unauthorized access.")
+        return redirect("dashboard")
+
+    hospital = request.user.hospital
+    unread_count = Message.objects.filter(recipient=request.user, is_read=False).count()
+
+    if request.method == "POST":
+        form = ServiceForm(request.POST)
+        if form.is_valid():
+            service = form.save(commit=False)
+            service.hospital = hospital
+            try:
+                service.save()
+            except IntegrityError:
+                messages.error(request, "A service with this name already exists.")
+            else:
+                messages.success(request, f"Service '{service.name}' created.")
+                return redirect("manage_services")
+    else:
+        form = ServiceForm()
+
+    services = Service.objects.filter(hospital=hospital).order_by("name")
+    return render(
+        request,
+        "billing/admin/services_manage.html",
+        {"form": form, "services": services, "unread_count": unread_count},
+    )
+
+
+@login_required
+def edit_service(request, service_id):
+    if request.user.role != "admin":
+        messages.error(request, "Unauthorized access.")
+        return redirect("dashboard")
+
+    service = hospital_scoped_or_404(Service, request.user, id=service_id)
+    unread_count = Message.objects.filter(recipient=request.user, is_read=False).count()
+
+    if request.method == "POST":
+        form = ServiceForm(request.POST, instance=service)
+        if form.is_valid():
+            updated = form.save(commit=False)
+            updated.hospital = request.user.hospital
+            try:
+                updated.save()
+            except IntegrityError:
+                messages.error(request, "A service with this name already exists.")
+            else:
+                messages.success(request, "Service updated.")
+                return redirect("manage_services")
+    else:
+        form = ServiceForm(instance=service)
+
+    return render(
+        request,
+        "billing/admin/service_edit.html",
+        {"form": form, "service": service, "unread_count": unread_count},
+    )
+
+
+@login_required
+def delete_service(request, service_id):
+    if request.user.role != "admin":
+        messages.error(request, "Unauthorized access.")
+        return redirect("dashboard")
+
+    if request.method != "POST":
+        return redirect("manage_services")
+
+    service = hospital_scoped_or_404(Service, request.user, id=service_id)
+    name = service.name
+    service.delete()
+    messages.success(request, f"Service '{name}' deleted.")
+    return redirect("manage_services")
 
 @login_required
 def doctor_dashboard(request):

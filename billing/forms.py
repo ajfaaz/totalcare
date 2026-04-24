@@ -1,4 +1,5 @@
 from django import forms
+from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm, SetPasswordForm
 from django.contrib.auth import get_user_model
 from django.forms.widgets import DateInput, TimeInput, Textarea, Select
@@ -257,7 +258,7 @@ class PrescriptionForm(forms.ModelForm):
 
 # ----------------- Hospital SLA Form -----------------
 
-from .models import Hospital, SLAPolicy
+from .models import Hospital, SLAPolicy, Service
 
 class HospitalSLAForm(forms.ModelForm):
     class Meta:
@@ -293,3 +294,20 @@ class SLAPolicyForm(forms.ModelForm):
             "max_escalation_level",
             "active",
         ]
+
+
+class ServiceForm(forms.ModelForm):
+    class Meta:
+        model = Service
+        fields = ["name", "description", "price"]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. Consultation"}),
+            "description": forms.Textarea(attrs={"class": "form-control", "rows": 2, "placeholder": "Optional"}),
+            "price": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+        }
+
+    def clean_name(self):
+        name = (self.cleaned_data.get("name") or "").strip()
+        if not name:
+            raise ValidationError("Service name is required.")
+        return name

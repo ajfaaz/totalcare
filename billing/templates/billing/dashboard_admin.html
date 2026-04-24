@@ -45,6 +45,14 @@
 <i class="bi bi-graph-up me-2"></i> Performance Trends
 </a>
 
+<hr class="text-secondary">
+
+<h6 class="text-light px-3">Billing Setup</h6>
+
+<a class="nav-link text-white" href="{% url 'manage_services' %}">
+<i class="bi bi-tags me-2"></i> Services & Pricing
+</a>
+
 {% endblock %}
 
 
@@ -55,6 +63,15 @@
 <p class="text-muted">
 Welcome <strong>{{ user.username }}</strong>. Overview of financial performance and clinical operations.
 </p>
+
+<div class="d-grid d-sm-flex gap-2 mb-4">
+  <a class="btn btn-outline-primary" href="{% url 'manage_services' %}">
+    <i class="bi bi-tags me-1"></i> Manage Services & Pricing
+  </a>
+  <a class="btn btn-outline-secondary" href="{% url 'register' %}">
+    <i class="bi bi-person-plus me-1"></i> Create Staff User
+  </a>
+</div>
 
 <div class="row mt-4">
 

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Service{% endblock %}
+
+{% block sidebar %}
+
+<a class="nav-link text-white" href="{% url 'admin_dashboard' %}">
+  <i class="bi bi-speedometer2 me-2"></i> Dashboard
+</a>
+
+<hr class="text-secondary">
+
+<h6 class="text-light px-3">Billing Setup</h6>
+
+<a class="nav-link text-white" href="{% url 'manage_services' %}">
+  <i class="bi bi-tags me-2"></i> Services & Pricing
+</a>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-bold mb-1">Edit Service</h2>
+    <p class="text-muted mb-0">Update name, description, and price.</p>
+  </div>
+  <a href="{% url 'manage_services' %}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Back
+  </a>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body">
+    <form method="post" class="row g-3">
+      {% csrf_token %}
+      <div class="col-12 col-md-4">
+        <label class="form-label">Service name</label>
+        {{ form.name }}
+        {% for e in form.name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+      </div>
+      <div class="col-12 col-md-5">
+        <label class="form-label">Description</label>
+        {{ form.description }}
+        {% for e in form.description.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label">Price (₦)</label>
+        {{ form.price }}
+        {% for e in form.price.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+      </div>
+      <div class="col-12 d-grid d-sm-flex gap-2">
+        <button class="btn btn-primary" type="submit">
+          <i class="bi bi-save me-1"></i> Save Changes
+        </button>
+        <a class="btn btn-outline-secondary" href="{% url 'manage_services' %}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
