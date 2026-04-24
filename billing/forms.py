@@ -97,9 +97,18 @@ class CustomUserCreationForm(UserCreationForm):
         )
 
     def __init__(self, *args, **kwargs):
+        self.request_user = kwargs.pop("request_user", None)
         super().__init__(*args, **kwargs)
         self.fields["role"].help_text = "Choose the staff member's access level."
         self.fields["specialty"].help_text = "Optional. Use for doctors or other specialist roles."
+
+        # Prevent hospital admins from creating platform admins (UI-level).
+        if self.request_user is not None and getattr(self.request_user, "role", None) != "platform_admin":
+            self.fields["role"].choices = [
+                (value, label)
+                for (value, label) in self.fields["role"].choices
+                if value != "platform_admin"
+            ]
 
         for field_name in ("username", "email", "specialty", "password1", "password2"):
             self.fields[field_name].widget.attrs.update({"class": "form-control"})
@@ -122,6 +131,14 @@ class CustomUserCreationForm(UserCreationForm):
             user.save()
         return user
 
+    def clean_role(self):
+        role = self.cleaned_data.get("role")
+        # Server-side protection (handles request tampering).
+        if self.request_user is not None and getattr(self.request_user, "role", None) != "platform_admin":
+            if role == "platform_admin":
+                raise ValidationError("You are not allowed to create a platform admin user.")
+        return role
+
 
 class StaffUserUpdateForm(forms.ModelForm):
     class Meta:
@@ -138,9 +155,26 @@ class StaffUserUpdateForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        self.request_user = kwargs.pop("request_user", None)
         super().__init__(*args, **kwargs)
         self.fields["role"].help_text = "Update the staff member's access level."
         self.fields["specialty"].help_text = "Optional. Useful for doctors and specialist roles."
+
+        # Prevent hospital admins from promoting users to platform admin (UI-level).
+        if self.request_user is not None and getattr(self.request_user, "role", None) != "platform_admin":
+            self.fields["role"].choices = [
+                (value, label)
+                for (value, label) in self.fields["role"].choices
+                if value != "platform_admin"
+            ]
+
+    def clean_role(self):
+        role = self.cleaned_data.get("role")
+        # Server-side protection (handles request tampering).
+        if self.request_user is not None and getattr(self.request_user, "role", None) != "platform_admin":
+            if role == "platform_admin":
+                raise ValidationError("You are not allowed to assign the platform admin role.")
+        return role
 
 
 class StaffPasswordResetForm(SetPasswordForm):

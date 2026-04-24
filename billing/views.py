@@ -2450,7 +2450,7 @@ def register(request):
     hospital = request.user.hospital
 
     if request.method == "POST":
-        form = CustomUserCreationForm(request.POST)
+        form = CustomUserCreationForm(request.POST, request_user=request.user)
         if form.is_valid():
             new_user = form.save(hospital=hospital)
             log_action(
@@ -2463,7 +2463,7 @@ def register(request):
             messages.success(request, f"User '{new_user.username}' created successfully.")
             return redirect("register")
     else:
-        form = CustomUserCreationForm()
+        form = CustomUserCreationForm(request_user=request.user)
 
     staff_users = CustomUser.objects.filter(hospital=hospital).order_by("role", "username")
     return render(
@@ -2490,7 +2490,7 @@ def admin_dashboard(request):
     hospital = request.user.hospital
 
     if request.method == "POST":
-        form = CustomUserCreationForm(request.POST)
+        form = CustomUserCreationForm(request.POST, request_user=request.user)
         if form.is_valid():
             new_user = form.save(hospital=hospital)
             log_action(
@@ -2503,7 +2503,7 @@ def admin_dashboard(request):
             messages.success(request, f"User '{new_user.username}' created successfully.")
             return redirect("admin_dashboard")
     else:
-        form = CustomUserCreationForm()
+        form = CustomUserCreationForm(request_user=request.user)
 
     return render(request, "billing/dashboard_admin.html", build_admin_dashboard_context(request, form=form))
 
@@ -2546,8 +2546,13 @@ def edit_staff_user(request, user_id):
 
     staff_user = hospital_scoped_or_404(CustomUser, request.user, id=user_id)
 
+    # Extra safety: hospital admins must never manage platform admins, even if someone forces it into the same hospital.
+    if getattr(staff_user, "role", None) == "platform_admin" and request.user.role != "platform_admin":
+        messages.error(request, "Unauthorized access.")
+        return redirect("admin_dashboard")
+
     if request.method == "POST":
-        profile_form = StaffUserUpdateForm(request.POST, instance=staff_user)
+        profile_form = StaffUserUpdateForm(request.POST, instance=staff_user, request_user=request.user)
         password_form = StaffPasswordResetForm(staff_user)
 
         if profile_form.is_valid():
@@ -2588,7 +2593,7 @@ def edit_staff_user(request, user_id):
                 messages.success(request, f"User '{updated_user.username}' updated successfully.")
                 return redirect("edit_staff_user", user_id=staff_user.id)
     else:
-        profile_form = StaffUserUpdateForm(instance=staff_user)
+        profile_form = StaffUserUpdateForm(instance=staff_user, request_user=request.user)
         password_form = StaffPasswordResetForm(staff_user)
 
     return render(
@@ -2613,7 +2618,7 @@ def reset_staff_password(request, user_id):
     if request.method != "POST":
         return redirect("edit_staff_user", user_id=staff_user.id)
 
-    profile_form = StaffUserUpdateForm(instance=staff_user)
+    profile_form = StaffUserUpdateForm(instance=staff_user, request_user=request.user)
     password_form = StaffPasswordResetForm(staff_user, request.POST)
 
     if password_form.is_valid():
