@@ -2922,7 +2922,8 @@ def pharmacist_dispense_prescription(request, prescription_id):
                 return None
             m = re.match(r"^(?P<name>.+?)\s*[xX]\s*(?P<qty>\d+)\s*$", raw_line)
             if not m:
-                return None
+                # Backwards compatibility: old prescriptions may store just a medicine name.
+                return raw_line, 1
             return m.group("name").strip(), int(m.group("qty"))
 
         # Validate and apply as one unit of work.
@@ -2930,9 +2931,6 @@ def pharmacist_dispense_prescription(request, prescription_id):
             for line in lines:
                 parsed = parse_line(line)
                 if not parsed:
-                    # If the line isn't in "name x qty" format, we can't safely update inventory.
-                    if (line or "").strip():
-                        errors.append(f"Invalid medicine format: '{line}'. Use 'Medicine Name x 2'.")
                     continue
 
                 med_name, qty_needed = parsed

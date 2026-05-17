@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm, SetPasswordForm
 from django.contrib.auth import get_user_model
 from django.forms.widgets import DateInput, TimeInput, Textarea, Select
+import re
 from .models import (
     Patient,
     PatientCoverage,
@@ -276,7 +277,7 @@ class PrescriptionForm(forms.ModelForm):
                 attrs={
                     "class": "form-control",
                     "rows": 5,
-                    "placeholder": "Enter one medicine per line, e.g.\nParacetamol 500mg - twice daily\nIbuprofen 200mg - after meals"
+                    "placeholder": "Enter one medicine per line as: Medicine Name x Qty\nExample:\nParacetamol 500mg x 2\nIbuprofen 200mg x 1"
                 }
             ),
             "dosage": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g., 1 tablet"}),
@@ -289,6 +290,25 @@ class PrescriptionForm(forms.ModelForm):
                 }
             ),
         }
+
+    def clean_medicines(self):
+        medicines = (self.cleaned_data.get("medicines") or "").strip()
+        if not medicines:
+            raise ValidationError("Please add at least one medicine.")
+
+        # Expected each line as "Name x Qty"
+        lines = [ln.strip() for ln in medicines.splitlines() if ln.strip()]
+        bad = []
+        for ln in lines:
+            if not re.match(r"^.+?\\s*[xX]\\s*\\d+\\s*$", ln):
+                bad.append(ln)
+
+        if bad:
+            raise ValidationError(
+                "Each medicine must be in the format 'Medicine Name x Qty'. "
+                f"Invalid lines: {', '.join(bad[:5])}"
+            )
+        return "\n".join(lines)
 
 # ----------------- Hospital SLA Form -----------------
 
