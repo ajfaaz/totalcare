@@ -192,7 +192,7 @@ urlpatterns = [
     ),
     path(
         "pharmacist/prescriptions/<int:prescription_id>/dispense/",
-        views.dispense_prescription,
+        views.pharmacist_dispense_prescription,
         name="pharmacist_dispense_prescription"
     ),
     path(

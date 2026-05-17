@@ -2856,6 +2856,9 @@ def pending_prescriptions(request):
 from django.utils import timezone
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect
+from django.db import transaction
+from django.db.models import F
+import re
 from .models import Prescription
 
 @login_required
@@ -2866,13 +2869,8 @@ def dispense_prescription(request, prescription_id):
     if request.user.role != "pharmacist":
         return HttpResponse("Unauthorized", status=403)
 
-    prescription.status = "dispensed"
-    prescription.pharmacist = request.user
-    prescription.dispensed_at = timezone.now()
-    prescription.save()
-
-    messages.success(request, "Prescription dispensed successfully.")
-    return redirect("pharmacist_dashboard")
+    # Legacy route: keep it working but always use the inventory-safe flow.
+    return redirect("pharmacist_dispense_prescription", prescription_id=prescription.id)
 
 
 @login_required
@@ -2915,38 +2913,68 @@ def pharmacist_dispense_prescription(request, prescription_id):
         # -------------------------------
         # 1️⃣ Deduct medicine from inventory
         # -------------------------------
-        lines = prescription.medicines.split("\n")  # medicine1 x 2
+        lines = prescription.medicines.splitlines()  # expected: "Medicine Name x 2"
         errors = []
 
-        for line in lines:
-            if "x" not in line:
-                continue
+        def parse_line(raw_line: str):
+            raw_line = (raw_line or "").strip()
+            if not raw_line:
+                return None
+            m = re.match(r"^(?P<name>.+?)\s*[xX]\s*(?P<qty>\d+)\s*$", raw_line)
+            if not m:
+                return None
+            return m.group("name").strip(), int(m.group("qty"))
 
-            med_name = line.split("x")[0].strip()
-            qty_needed = int(line.split("x")[1].strip())
+        # Validate and apply as one unit of work.
+        with transaction.atomic():
+            for line in lines:
+                parsed = parse_line(line)
+                if not parsed:
+                    # If the line isn't in "name x qty" format, we can't safely update inventory.
+                    if (line or "").strip():
+                        errors.append(f"Invalid medicine format: '{line}'. Use 'Medicine Name x 2'.")
+                    continue
 
-            try:
-                med = Medicine.objects.get(
-                    hospital=request.user.hospital,
-                    name__iexact=med_name
+                med_name, qty_needed = parsed
+                if qty_needed <= 0:
+                    errors.append(f"Invalid quantity for {med_name}.")
+                    continue
+
+                try:
+                    med = Medicine.objects.select_for_update().get(
+                        hospital=request.user.hospital,
+                        name__iexact=med_name,
+                    )
+                except Medicine.DoesNotExist:
+                    errors.append(f"{med_name} is not found in inventory.")
+                    continue
+
+                updated = Medicine.objects.filter(
+                    pk=med.pk,
+                    quantity__gte=qty_needed,
+                ).update(quantity=F("quantity") - qty_needed)
+
+                if updated != 1:
+                    med.refresh_from_db(fields=["quantity"])
+                    errors.append(
+                        f"Not enough stock for: {med.name} (needed {qty_needed}, available {med.quantity})"
+                    )
+                    continue
+
+                StockLog.objects.create(
+                    medicine=med,
+                    user=request.user,
+                    action="out",
+                    quantity=qty_needed,
+                    notes=f"Dispensed via prescription #{prescription.id}",
                 )
-            except Medicine.DoesNotExist:
-                errors.append(f"{med_name} is not found in inventory.")
-                continue
-
-            if med.quantity < qty_needed:
-                errors.append(f"Not enough stock for: {med_name} (needed {qty_needed}, available {med.quantity})")
-            else:
-                # deduct from stock
-                med.quantity -= qty_needed
-                med.save()
 
         # If any errors, stop dispensing
         if errors:
             messages.error(request, "Unable to dispense prescription:")
             for e in errors:
                 messages.error(request, e)
-            return redirect("pharmacist_dispense_view", prescription_id=prescription.id)
+            return redirect("pharmacist_dispense_prescription", prescription_id=prescription.id)
 
         # -------------------------------
         # 2️⃣ Update prescription record
@@ -2958,7 +2986,7 @@ def pharmacist_dispense_prescription(request, prescription_id):
         prescription.save()
 
         messages.success(request, "Prescription dispensed successfully.")
-        return redirect("pharmacist_history")
+        return redirect("dispense_history")
 
     # GET request: show confirmation page
     return render(request, "billing/pharmacist_dispense_confirm.html", {
@@ -3218,7 +3246,7 @@ def stock_in(request, pk):
 
         StockLog.objects.create(
             medicine=med,
-            action="IN",
+            action="in",
             quantity=qty,
             user=request.user
         )
@@ -3247,7 +3275,7 @@ def stock_out(request, pk):
 
         StockLog.objects.create(
             medicine=med,
-            action="OUT",
+            action="out",
             quantity=qty,
             user=request.user
         )
@@ -3278,8 +3306,10 @@ def stock_logs_view(request):
     if med:
         logs = logs.filter(medicine__id=med)
 
-    if action in ["IN", "OUT"]:
-        logs = logs.filter(action=action)
+    if action in ["IN", "OUT", "in", "out"]:
+        # Support legacy uppercase values as well.
+        normalized = action.lower()
+        logs = logs.filter(action__in=[normalized, normalized.upper()])
 
     logs = logs.order_by("-timestamp")
 
