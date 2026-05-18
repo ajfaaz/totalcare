@@ -300,7 +300,8 @@ class PrescriptionForm(forms.ModelForm):
         lines = [ln.strip() for ln in medicines.splitlines() if ln.strip()]
         bad = []
         for ln in lines:
-            if not re.match(r"^.+?\\s*[xX]\\s*\\d+\\s*$", ln):
+            # "Paracetamol 500mg x 2" (case-insensitive x, flexible spacing)
+            if not re.match(r"^.+?\s*[xX]\s*\d+\s*$", ln):
                 bad.append(ln)
 
         if bad:

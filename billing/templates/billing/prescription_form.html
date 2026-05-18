@@ -84,6 +84,9 @@
 
                 <!-- Hidden field to send final list (format: Name x Qty per line) -->
                 <textarea name="medicines" id="finalMedicineList" class="d-none"></textarea>
+                {% if form.medicines.errors %}
+                    <div class="text-danger mt-2">{{ form.medicines.errors.0 }}</div>
+                {% endif %}
             </div>
 
             <!-- =========================================
