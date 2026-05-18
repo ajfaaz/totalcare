@@ -13,6 +13,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.template.loader import get_template, render_to_string
 from django.conf import settings
+from django.utils.text import slugify
 from .models import MedicineCategory
 from billing.utils.vitals import evaluate_vitals
 import json
@@ -36,6 +37,7 @@ from .forms import (
     HospitalSLAForm,
     HospitalCreateForm,
     ServiceForm,
+    DemoSignupForm,
 )
 from .models import (
     Appointment,
@@ -741,6 +743,79 @@ def dashboard(request):
 
 def home(request):
     return render(request, "home.html")
+
+
+def _unique_hospital_slug(base_name: str):
+    """Generate a unique slug for Hospital without prompting the user."""
+    base = slugify(base_name)[:45] or "hospital"
+    slug = base
+    i = 2
+    while Hospital.objects.filter(slug=slug).exists():
+        suffix = f"-{i}"
+        slug = f"{base[:45-len(suffix)]}{suffix}"
+        i += 1
+    return slug
+
+
+def demo_signup(request):
+    """Public: create a 30-day demo hospital + admin user and log them in."""
+    if request.user.is_authenticated:
+        return redirect("dashboard")
+
+    if request.method == "POST":
+        form = DemoSignupForm(request.POST)
+        if form.is_valid():
+            hospital_name = form.cleaned_data["hospital_name"].strip()
+            full_name = form.cleaned_data["full_name"].strip()
+            email = form.cleaned_data["email"].strip().lower()
+            username = form.cleaned_data["username"].strip()
+            password = form.cleaned_data["password1"]
+
+            if CustomUser.objects.filter(username__iexact=username).exists():
+                form.add_error("username", "This username is already taken.")
+                return render(request, "billing/demo_signup.html", {"form": form})
+            if CustomUser.objects.filter(email__iexact=email).exists():
+                form.add_error("email", "An account with this email already exists.")
+                return render(request, "billing/demo_signup.html", {"form": form})
+
+            # Create hospital + subscription trial
+            from datetime import date, timedelta
+            hospital = Hospital.objects.create(
+                name=hospital_name,
+                slug=_unique_hospital_slug(hospital_name),
+                owner_email=email,
+                is_active=True,
+            )
+            Subscription.objects.create(
+                hospital=hospital,
+                plan="standard",
+                start_date=date.today(),
+                end_date=date.today() + timedelta(days=30),
+                is_active=True,
+            )
+
+            # Create admin user for that hospital
+            user = CustomUser.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                role="admin",
+                hospital=hospital,
+            )
+            if full_name:
+                parts = full_name.split(None, 1)
+                user.first_name = parts[0]
+                if len(parts) > 1:
+                    user.last_name = parts[1]
+                user.save(update_fields=["first_name", "last_name"])
+
+            login(request, user)
+            messages.success(request, "Demo activated. Your 30-day trial has started.")
+            return redirect("dashboard")
+    else:
+        form = DemoSignupForm()
+
+    return render(request, "billing/demo_signup.html", {"form": form})
 
 
 @login_required

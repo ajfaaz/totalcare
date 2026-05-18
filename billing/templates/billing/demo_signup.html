@@ -1,0 +1,84 @@
+{% extends "billing/base_public.html" %}
+{% load static %}
+
+{% block title %}Start Free Demo{% endblock %}
+
+{% block content %}
+
+<section class="py-5" style="min-height: calc(100vh - 140px); background: linear-gradient(135deg, #0d6efd 0%, #0b2b6b 55%, #071428 100%);">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-7">
+        <div class="text-center text-white mb-4">
+          <h1 class="fw-bold mb-2">Start a Free 30-Day Demo</h1>
+          <p class="mb-0 opacity-75">Create your hospital workspace and invite staff in minutes.</p>
+        </div>
+
+        <div class="card shadow-lg border-0">
+          <div class="card-body p-4 p-md-5">
+            <form method="post" novalidate>
+              {% csrf_token %}
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Hospital / Clinic Name</label>
+                {{ form.hospital_name }}
+                {% if form.hospital_name.errors %}<div class="text-danger small mt-1">{{ form.hospital_name.errors.0 }}</div>{% endif %}
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Your Name</label>
+                {{ form.full_name }}
+                {% if form.full_name.errors %}<div class="text-danger small mt-1">{{ form.full_name.errors.0 }}</div>{% endif %}
+              </div>
+
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-semibold">Email</label>
+                  {{ form.email }}
+                  {% if form.email.errors %}<div class="text-danger small mt-1">{{ form.email.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-semibold">Username</label>
+                  {{ form.username }}
+                  {% if form.username.errors %}<div class="text-danger small mt-1">{{ form.username.errors.0 }}</div>{% endif %}
+                </div>
+              </div>
+
+              <div class="row g-3 mt-1">
+                <div class="col-md-6">
+                  <label class="form-label fw-semibold">Password</label>
+                  {{ form.password1 }}
+                  {% if form.password1.errors %}<div class="text-danger small mt-1">{{ form.password1.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-semibold">Confirm Password</label>
+                  {{ form.password2 }}
+                  {% if form.password2.errors %}<div class="text-danger small mt-1">{{ form.password2.errors.0 }}</div>{% endif %}
+                </div>
+              </div>
+
+              {% if form.non_field_errors %}
+                <div class="alert alert-danger mt-3 mb-0">{{ form.non_field_errors.0 }}</div>
+              {% endif %}
+
+              <button type="submit" class="btn btn-primary w-100 mt-4">
+                Activate Demo
+              </button>
+
+              <p class="text-muted small mt-3 mb-0">
+                By continuing, you agree this demo expires in 30 days.
+              </p>
+            </form>
+          </div>
+        </div>
+
+        <div class="text-center mt-3">
+          <a href="{% url 'login' %}" class="text-white-50 text-decoration-none">Already have an account? Login</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+

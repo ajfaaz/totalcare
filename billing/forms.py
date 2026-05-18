@@ -366,3 +366,35 @@ class ServiceForm(forms.ModelForm):
         if not name:
             raise ValidationError("Service name is required.")
         return name
+
+
+class DemoSignupForm(forms.Form):
+    hospital_name = forms.CharField(
+        max_length=100,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Hospital / Clinic name"}),
+    )
+    full_name = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Full name"}),
+    )
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={"class": "form-control", "placeholder": "Email address"}),
+    )
+    username = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Username"}),
+    )
+    password1 = forms.CharField(
+        widget=forms.PasswordInput(attrs={"class": "form-control", "placeholder": "Password"}),
+    )
+    password2 = forms.CharField(
+        widget=forms.PasswordInput(attrs={"class": "form-control", "placeholder": "Confirm password"}),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        p1 = cleaned.get("password1")
+        p2 = cleaned.get("password2")
+        if p1 and p2 and p1 != p2:
+            self.add_error("password2", "Passwords do not match.")
+        return cleaned
