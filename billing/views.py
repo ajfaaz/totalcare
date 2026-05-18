@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model, login
 from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Q, Max, F, Count, Avg, Value
-from django.db.models.functions import TruncMonth, Concat
+from django.db.models.functions import TruncMonth, Concat, Coalesce
 from django.contrib.auth.forms import AuthenticationForm
 from django.http import HttpResponse, HttpResponseForbidden
 from django.core.exceptions import ObjectDoesNotExist
@@ -245,6 +245,17 @@ def build_accountant_dashboard_context(user):
     hospital = user.hospital
     nhis = Payer.objects.filter(code="NHIS").first()
     kschma = Payer.objects.filter(code="KSCHMA").first()
+    today = timezone.localdate()
+    month_start = today.replace(day=1)
+
+    payments = Payment.objects.filter(hospital=hospital)
+    daily_revenue = payments.filter(paid_on__date=today).aggregate(t=Sum("amount_paid"))["t"] or 0
+    mtd_revenue = payments.filter(paid_on__date__gte=month_start, paid_on__date__lte=today).aggregate(t=Sum("amount_paid"))["t"] or 0
+    daily_by_method = {
+        "cash": payments.filter(paid_on__date=today, payment_mode="cash").aggregate(t=Sum("amount_paid"))["t"] or 0,
+        "card": payments.filter(paid_on__date=today, payment_mode="card").aggregate(t=Sum("amount_paid"))["t"] or 0,
+        "transfer": payments.filter(paid_on__date=today, payment_mode="transfer").aggregate(t=Sum("amount_paid"))["t"] or 0,
+    }
 
     government_bills = Bill.objects.filter(
         hospital=hospital,
@@ -253,6 +264,12 @@ def build_accountant_dashboard_context(user):
 
     nhis_bills = government_bills.filter(patient__patientcoverage__payer=nhis).order_by("-created_at")
     kschma_bills = government_bills.filter(patient__patientcoverage__payer=kschma).order_by("-created_at")
+
+    # HMO / Corporate receivables are represented as non-government third party payers.
+    sponsor_bills = Bill.objects.filter(
+        hospital=hospital,
+        third_party__payer_type__in=["private", "hospital"],
+    ).select_related("patient", "third_party").order_by("-created_at")
 
     def bill_totals(qs):
         total = qs.aggregate(t=Sum("third_party_payable"))["t"] or 0
@@ -264,7 +281,28 @@ def build_accountant_dashboard_context(user):
             "unpaid": unpaid,
         }
 
+    # Quick financial statement (lightweight): AR patient + AR third-party.
+    patient_ar_qs = (
+        Bill.objects.filter(hospital=hospital)
+        .annotate(paid_sum=Coalesce(Sum("payment__amount_paid"), 0))
+        .annotate(patient_due=F("patient_payable") - F("paid_sum"))
+        .filter(patient_due__gt=0)
+    )
+    patient_receivables = patient_ar_qs.aggregate(t=Sum("patient_due"))["t"] or 0
+
+    third_party_receivables = Bill.objects.filter(
+        hospital=hospital,
+        third_party__isnull=False,
+        is_fully_paid=False,
+    ).aggregate(t=Sum("third_party_payable"))["t"] or 0
+
+    sponsor_receivables = sponsor_bills.filter(is_fully_paid=False).aggregate(t=Sum("third_party_payable"))["t"] or 0
+
     return {
+        "today": today,
+        "daily_revenue": daily_revenue,
+        "mtd_revenue": mtd_revenue,
+        "daily_by_method": daily_by_method,
         "nhis": bill_totals(nhis_bills),
         "kschma": bill_totals(kschma_bills),
         # Keep dashboard minimal: show only a few recent unpaid claims for quick action.
@@ -272,6 +310,10 @@ def build_accountant_dashboard_context(user):
         "kschma_unpaid_recent": kschma_bills.filter(is_fully_paid=False)[:5],
         "nhis_total_count": nhis_bills.count(),
         "kschma_total_count": kschma_bills.count(),
+        "sponsor_receivables": sponsor_receivables,
+        "sponsor_unpaid_recent": sponsor_bills.filter(is_fully_paid=False)[:5],
+        "patient_receivables": patient_receivables,
+        "third_party_receivables": third_party_receivables,
         "government_bill_count": government_bills.count(),
         "unread_count": Message.objects.filter(recipient=user, is_read=False).count(),
     }
