@@ -255,17 +255,23 @@ def build_accountant_dashboard_context(user):
     kschma_bills = government_bills.filter(patient__patientcoverage__payer=kschma).order_by("-created_at")
 
     def bill_totals(qs):
+        total = qs.aggregate(t=Sum("third_party_payable"))["t"] or 0
+        paid = qs.filter(is_fully_paid=True).aggregate(p=Sum("third_party_payable"))["p"] or 0
+        unpaid = qs.filter(is_fully_paid=False).aggregate(u=Sum("third_party_payable"))["u"] or 0
         return {
-            "total": qs.aggregate(t=Sum("third_party_payable"))["t"] or 0,
-            "paid": qs.filter(is_fully_paid=True).aggregate(p=Sum("third_party_payable"))["p"] or 0,
-            "unpaid": qs.filter(is_fully_paid=False).aggregate(u=Sum("third_party_payable"))["u"] or 0,
+            "total": total,
+            "paid": paid,
+            "unpaid": unpaid,
         }
 
     return {
         "nhis": bill_totals(nhis_bills),
         "kschma": bill_totals(kschma_bills),
-        "nhis_bills": nhis_bills[:10],
-        "kschma_bills": kschma_bills[:10],
+        # Keep dashboard minimal: show only a few recent unpaid claims for quick action.
+        "nhis_unpaid_recent": nhis_bills.filter(is_fully_paid=False)[:5],
+        "kschma_unpaid_recent": kschma_bills.filter(is_fully_paid=False)[:5],
+        "nhis_total_count": nhis_bills.count(),
+        "kschma_total_count": kschma_bills.count(),
         "government_bill_count": government_bills.count(),
         "unread_count": Message.objects.filter(recipient=user, is_read=False).count(),
     }

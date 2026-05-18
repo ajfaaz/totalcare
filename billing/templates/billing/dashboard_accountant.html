@@ -9,7 +9,7 @@
     <h2 class="fw-bold text-primary mb-1">
       <i class="bi bi-cash-coin me-2"></i>Accountant Dashboard
     </h2>
-    <p class="text-muted mb-0">Track government claims, billing totals, and outstanding reimbursements.</p>
+    <p class="text-muted mb-0">Quick view of government claims and outstanding reimbursements.</p>
   </div>
   <div class="d-flex gap-2">
     <a href="{% url 'bill_list' %}" class="btn btn-outline-primary">All Bills</a>
@@ -52,144 +52,92 @@
   </div>
 </div>
 
-<div class="row g-4 mb-4">
-  <div class="col-lg-6">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <h5 class="fw-bold mb-3">NHIS Summary</h5>
-        <div class="row g-3">
-          <div class="col-4">
-            <div class="border rounded p-3 h-100">
-              <div class="small text-muted">Total</div>
-              <div class="fw-semibold">₦{{ nhis.total }}</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="border rounded p-3 h-100">
-              <div class="small text-muted">Paid</div>
-              <div class="fw-semibold text-success">₦{{ nhis.paid }}</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="border rounded p-3 h-100">
-              <div class="small text-muted">Outstanding</div>
-              <div class="fw-semibold text-danger">₦{{ nhis.unpaid }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="col-lg-6">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <h5 class="fw-bold mb-3">KSCHMA Summary</h5>
-        <div class="row g-3">
-          <div class="col-4">
-            <div class="border rounded p-3 h-100">
-              <div class="small text-muted">Total</div>
-              <div class="fw-semibold">₦{{ kschma.total }}</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="border rounded p-3 h-100">
-              <div class="small text-muted">Paid</div>
-              <div class="fw-semibold text-success">₦{{ kschma.paid }}</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="border rounded p-3 h-100">
-              <div class="small text-muted">Outstanding</div>
-              <div class="fw-semibold text-danger">₦{{ kschma.unpaid }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <div class="row g-4">
   <div class="col-lg-6">
-    <div class="card shadow-sm">
+    <div class="card shadow-sm h-100">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="fw-bold mb-0">Recent NHIS Claims</h5>
-          <span class="badge bg-secondary">{{ nhis_bills|length }} shown</span>
+          <h5 class="fw-bold mb-0">NHIS Outstanding</h5>
+          <span class="badge bg-light text-dark">{{ nhis_total_count }} total</span>
         </div>
-        {% if nhis_bills %}
+        <div class="d-flex justify-content-between align-items-end mb-3">
+          <div>
+            <div class="small text-muted">Outstanding Amount</div>
+            <div class="fs-4 fw-bold text-danger">₦{{ nhis.unpaid }}</div>
+          </div>
+          <a href="{% url 'nhis_claims_dashboard' %}" class="btn btn-sm btn-outline-primary">View details</a>
+        </div>
+
+        {% if nhis_unpaid_recent %}
           <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-sm table-hover align-middle mb-0">
               <thead class="table-light">
                 <tr>
                   <th>Invoice</th>
                   <th>Patient</th>
-                  <th>Amount</th>
-                  <th>Status</th>
+                  <th class="text-end">Amount</th>
                 </tr>
               </thead>
               <tbody>
-                {% for bill in nhis_bills %}
+                {% for bill in nhis_unpaid_recent %}
                   <tr>
-                    <td>{{ bill.invoice_no }}</td>
-                    <td>{{ bill.patient.full_name }}</td>
-                    <td>₦{{ bill.third_party_payable }}</td>
                     <td>
-                      {% if bill.is_fully_paid %}
-                        <span class="badge bg-success">Paid</span>
-                      {% else %}
-                        <span class="badge bg-warning text-dark">Pending</span>
-                      {% endif %}
+                      <a href="{% url 'view_invoice' bill.id %}" class="text-decoration-none">{{ bill.invoice_no }}</a>
                     </td>
+                    <td class="text-truncate" style="max-width: 220px;">{{ bill.patient.full_name }}</td>
+                    <td class="text-end">₦{{ bill.third_party_payable }}</td>
                   </tr>
                 {% endfor %}
               </tbody>
             </table>
           </div>
         {% else %}
-          <div class="alert alert-light border mb-0">No NHIS claims yet.</div>
+          <div class="alert alert-light border mb-0">No outstanding NHIS claims.</div>
         {% endif %}
       </div>
     </div>
   </div>
+
   <div class="col-lg-6">
-    <div class="card shadow-sm">
+    <div class="card shadow-sm h-100">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="fw-bold mb-0">Recent KSCHMA Claims</h5>
-          <span class="badge bg-secondary">{{ kschma_bills|length }} shown</span>
+          <h5 class="fw-bold mb-0">KSCHMA Outstanding</h5>
+          <span class="badge bg-light text-dark">{{ kschma_total_count }} total</span>
         </div>
-        {% if kschma_bills %}
+        <div class="d-flex justify-content-between align-items-end mb-3">
+          <div>
+            <div class="small text-muted">Outstanding Amount</div>
+            <div class="fs-4 fw-bold text-danger">₦{{ kschma.unpaid }}</div>
+          </div>
+          <a href="{% url 'nhis_claims_dashboard' %}" class="btn btn-sm btn-outline-primary">View details</a>
+        </div>
+
+        {% if kschma_unpaid_recent %}
           <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
+            <table class="table table-sm table-hover align-middle mb-0">
               <thead class="table-light">
                 <tr>
                   <th>Invoice</th>
                   <th>Patient</th>
-                  <th>Amount</th>
-                  <th>Status</th>
+                  <th class="text-end">Amount</th>
                 </tr>
               </thead>
               <tbody>
-                {% for bill in kschma_bills %}
+                {% for bill in kschma_unpaid_recent %}
                   <tr>
-                    <td>{{ bill.invoice_no }}</td>
-                    <td>{{ bill.patient.full_name }}</td>
-                    <td>₦{{ bill.third_party_payable }}</td>
                     <td>
-                      {% if bill.is_fully_paid %}
-                        <span class="badge bg-success">Paid</span>
-                      {% else %}
-                        <span class="badge bg-warning text-dark">Pending</span>
-                      {% endif %}
+                      <a href="{% url 'view_invoice' bill.id %}" class="text-decoration-none">{{ bill.invoice_no }}</a>
                     </td>
+                    <td class="text-truncate" style="max-width: 220px;">{{ bill.patient.full_name }}</td>
+                    <td class="text-end">₦{{ bill.third_party_payable }}</td>
                   </tr>
                 {% endfor %}
               </tbody>
             </table>
           </div>
         {% else %}
-          <div class="alert alert-light border mb-0">No KSCHMA claims yet.</div>
+          <div class="alert alert-light border mb-0">No outstanding KSCHMA claims.</div>
         {% endif %}
       </div>
     </div>
