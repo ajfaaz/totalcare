@@ -30,7 +30,7 @@
             {% for item in bill.services.all %}
             <tr>
                 <td>{{ item.name }}</td>
-                <td>${{ item.cost }}</td>
+                <td>₦{{ item.cost }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -48,7 +48,7 @@
             <tr>
                 <td>{{ item.medicine.name }}</td>
                 <td>{{ item.quantity }}</td>
-                <td>${{ item.cost }}</td>
+                <td>₦{{ item.cost }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -62,13 +62,13 @@
         <p><strong>Room:</strong> {{ bill.admission.bed.room.room_type }} - {{ bill.admission.bed.room.room_number }}</p>
         <p><strong>Bed:</strong> {{ bill.admission.bed.bed_number }}</p>
         <p><strong>Days Stayed:</strong> {{ bill.admission.stay_duration }}</p>
-        <p><strong>Daily Rate:</strong> ${{ bill.admission.bed.room.price_per_day }}</p>
-        <p><strong>Total Room Charge:</strong> ${{ bill.admission.stay_duration|multiply:bill.admission.bed.room.price_per_day }}</p>
+        <p><strong>Daily Rate:</strong> ₦{{ bill.admission.bed.room.price_per_day }}</p>
+        <p><strong>Total Room Charge:</strong> ₦{{ bill.admission.stay_duration|multiply:bill.admission.bed.room.price_per_day }}</p>
     {% else %}
         <p>No admission details available.</p>
     {% endif %}
 
-    <h2>Total Amount Due: ${{ bill.total_amount }}</h2>
+    <h2>Total Amount Due: ₦{{ bill.total_amount }}</h2>
     
 </body>
 </html>

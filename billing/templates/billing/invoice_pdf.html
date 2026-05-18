@@ -10,12 +10,12 @@
       <tr>
         <td>{{ item.service.name }}</td>
         <td>{{ item.quantity }}</td>
-        <td>${{ item.subtotal }}</td>
+        <td>₦{{ item.subtotal }}</td>
       </tr>
       {% endfor %}
     </table>
-    <p><strong>Total:</strong> ${{ bill.total_amount }}</p>
-    <p><strong>Paid:</strong> ${{ paid }}</p>
-    <p><strong>Due:</strong> ${{ due }}</p>
+    <p><strong>Total:</strong> ₦{{ bill.total_amount }}</p>
+    <p><strong>Paid:</strong> ₦{{ paid }}</p>
+    <p><strong>Due:</strong> ₦{{ due }}</p>
   </body>
 </html>

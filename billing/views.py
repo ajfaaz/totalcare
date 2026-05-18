@@ -578,7 +578,34 @@ def dashboard(request):
     # ==============================
     if user.role == "doctor":
         query = request.GET.get("q")
+        today = timezone.localdate()
+        now_local = timezone.localtime()
+        now_time = now_local.time()
         last_30_days = timezone.now() - timedelta(days=30)
+
+        # Auto-refresh daily: close out stale visits and past appointments for this doctor.
+        # This prevents yesterday's queue from lingering forever.
+        PatientVisit.objects.filter(
+            hospital=hospital,
+            assigned_doctor=user,
+            is_active=True,
+            status__in=["pending", "under_diagnosis"],
+        ).exclude(created_at__date=today).update(is_active=False, status="completed")
+
+        Appointment.objects.filter(
+            hospital=hospital,
+            doctor=user,
+            status="scheduled",
+            date__lt=today,
+        ).update(status="cancelled")
+
+        Appointment.objects.filter(
+            hospital=hospital,
+            doctor=user,
+            status="scheduled",
+            date=today,
+            time__lt=now_time,
+        ).update(status="cancelled")
 
         patients = Patient.objects.filter(
             hospital=hospital,
@@ -595,12 +622,15 @@ def dashboard(request):
         active_visits = PatientVisit.objects.filter(
             hospital=hospital,
             assigned_doctor=user,
+            is_active=True,
         ).exclude(status="completed").select_related("patient")
 
         queue = PatientVisit.objects.filter(
             hospital=hospital,
             assigned_doctor=user,
+            is_active=True,
             status__in=["pending", "under_diagnosis"],
+            created_at__date=today,
         ).select_related("patient").order_by("-is_emergency", "created_at")
 
         doctor_prescriptions = Prescription.objects.filter(hospital=hospital, doctor=user)
@@ -610,7 +640,9 @@ def dashboard(request):
         today_appointments = Appointment.objects.filter(
             hospital=hospital,
             doctor=user,
-            date=timezone.localdate(),
+            status="scheduled",
+            date=today,
+            time__gte=now_time,
         ).select_related("patient")
 
         return render(request, "billing/dashboard_doctor.html", {
