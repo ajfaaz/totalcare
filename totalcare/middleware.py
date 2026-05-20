@@ -73,6 +73,7 @@ class SubscriptionMiddleware:
             '/platform/payment/',
             '/verify-payment/',
             '/payment-failed/',
+            '/demo/',
             '/',  # home page
             '/login/',
             '/logout/',

@@ -792,6 +792,7 @@ def demo_signup(request):
                 start_date=date.today(),
                 end_date=date.today() + timedelta(days=30),
                 is_active=True,
+                is_trial=True,
             )
 
             # Create admin user for that hospital

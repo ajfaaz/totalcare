@@ -32,7 +32,11 @@ class Hospital(models.Model):
     @property
     def is_subscription_active(self):
         try:
-            return self.subscription.is_active
+            sub = self.subscription
+            if not sub.is_active:
+                return False
+            # Expired trials/subscriptions are treated as inactive even if is_active wasn't flipped.
+            return sub.end_date >= timezone.localdate()
         except:
             return False
 
@@ -123,6 +127,7 @@ class Subscription(models.Model):
     end_date = models.DateField()
 
     is_active = models.BooleanField(default=True)
+    is_trial = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.hospital.name} - {self.plan}"

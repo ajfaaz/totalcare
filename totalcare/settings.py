@@ -118,6 +118,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'billing.context_processors.unread_messages',
+                'billing.context_processors.subscription_status',
             ],
         },
     },
