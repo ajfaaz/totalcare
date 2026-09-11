@@ -67,6 +67,11 @@
     }
 </style>
 
+    <!-- Favicon Links -->
+    <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}">
+    <link rel="shortcut icon" href="{% static 'images/favicon.ico' %}">
+    <link rel="apple-touch-icon" href="{% static 'images/apple-touch-icon.png' %}">
+
     <!-- Project CSS -->
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="{% static 'css/tc-responsive.css' %}">
@@ -78,8 +83,9 @@
 <!-- NAVBAR -->
 <nav class="navbar navbar-expand-lg navbar-dark fixed-top" style="background-color:#1f3c88;">
   <div class="container-fluid">
-    <a class="navbar-brand fw-bold" href="{% if user.role == 'platform_admin' %}{% url 'platform_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">
-    <i class="bi bi-hospital me-2"></i> TotalCare</a>
+    <a class="navbar-brand py-0 d-flex align-items-center" href="{% if user.role == 'platform_admin' %}{% url 'platform_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">
+      <img src="{% static 'images/logo_totalcare.png' %}" height="38" alt="TotalCare HMS" class="d-inline-block">
+    </a>
 
     <!-- Mobile: open the sidebar as an offcanvas menu -->
     <button class="btn btn-outline-light btn-sm d-md-none" type="button"
