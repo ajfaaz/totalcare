@@ -42,3 +42,26 @@
 .sidebar small {
     color: #9ca3af !important;
 }
+
+/* Brand Logo Constraints */
+.navbar-brand img,
+.tc-brand-logo {
+    max-height: 38px !important;
+    height: 38px !important;
+    width: auto !important;
+    object-fit: contain;
+}
+
+.tc-brand-logo-public {
+    max-height: 42px !important;
+    height: 42px !important;
+    width: auto !important;
+    object-fit: contain;
+}
+
+.tc-login-logo {
+    max-height: 60px !important;
+    height: 60px !important;
+    width: auto !important;
+    object-fit: contain;
+}

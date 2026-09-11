@@ -17,7 +17,15 @@ svg,
 video,
 canvas {
   max-width: 100%;
-  height: auto;
+}
+
+/* Navbar logo styling - prevent logo blowout */
+.navbar-brand img,
+.navbar img.tc-brand-logo {
+  max-height: 38px !important;
+  height: 38px !important;
+  width: auto !important;
+  object-fit: contain !important;
 }
 
 /* If any long strings (IDs, codes) appear, avoid breaking layout */

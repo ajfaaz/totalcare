@@ -84,7 +84,7 @@
 <nav class="navbar navbar-expand-lg navbar-dark fixed-top" style="background-color:#1f3c88;">
   <div class="container-fluid">
     <a class="navbar-brand py-0 d-flex align-items-center" href="{% if user.role == 'platform_admin' %}{% url 'platform_dashboard' %}{% else %}{% url 'dashboard' %}{% endif %}">
-      <img src="{% static 'images/logo_totalcare.png' %}" height="38" alt="TotalCare HMS" class="d-inline-block">
+      <img src="{% static 'images/logo_totalcare.png' %}" height="38" alt="TotalCare HMS" class="d-inline-block tc-brand-logo" style="max-height: 38px; height: 38px; width: auto; object-fit: contain;">
     </a>
 
     <!-- Mobile: open the sidebar as an offcanvas menu -->
