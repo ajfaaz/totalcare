@@ -163,6 +163,7 @@ class Subscription(models.Model):
     end_date = models.DateField()
 
     is_active = models.BooleanField(default=True)
+    is_trial = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.hospital.name} - {self.plan}"

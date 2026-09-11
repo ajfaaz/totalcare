@@ -19,6 +19,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.http import HttpResponse, HttpResponseForbidden
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
+from django.utils.text import slugify
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.template.loader import get_template, render_to_string
@@ -46,6 +47,10 @@ from .forms import (
     PatientRegistrationForm,
     HospitalSLAForm,
     HospitalCreateForm,
+    ServiceForm,
+    PrescriptionForm,
+    SLAPolicyForm,
+    PatientForm,
 )
 from .models import (
     Appointment,
