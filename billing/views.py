@@ -3,7 +3,17 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Q, Max, F, Count, Avg, Value, ExpressionWrapper, DurationField
+from django.db.models import (
+    Sum,
+    Q,
+    Max,
+    F,
+    Count,
+    Avg,
+    Value,
+    ExpressionWrapper,
+    DurationField,
+)
 from django.db.models.functions import TruncMonth, Concat
 from django.contrib.auth.forms import AuthenticationForm
 from django.http import HttpResponse, HttpResponseForbidden
@@ -19,7 +29,7 @@ import json
 from xhtml2pdf import pisa
 from datetime import timedelta
 from .models import ConsultationNote
-
+from .forms import DemoSignupForm
 
 
 from .forms import (
@@ -62,7 +72,6 @@ from .models import (
     LabTestRequest,
     RadiologyRequest,
     Subscription,
-    
 )
 from billing.utils.sla import sla_remaining_time, sla_timer_state
 from billing.utils.sla_metrics import doctor_sla_metrics
@@ -106,8 +115,9 @@ def user_can_create_pharmacy_bill(user):
 def platform_required(view_func):
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated or request.user.role != "platform_admin":
-            return redirect('login')
+            return redirect("login")
         return view_func(request, *args, **kwargs)
+
     return wrapper
 
 
@@ -124,13 +134,24 @@ def ensure_active_visit_for_appointment(appointment, started_by):
 
     if active_visit:
         updated_fields = []
-        if appointment.doctor and active_visit.assigned_doctor_id != appointment.doctor_id:
+        if (
+            appointment.doctor
+            and active_visit.assigned_doctor_id != appointment.doctor_id
+        ):
             active_visit.assigned_doctor = appointment.doctor
             updated_fields.append("assigned_doctor")
         if started_by and active_visit.assigned_by_id != started_by.id:
             active_visit.assigned_by = started_by
             updated_fields.append("assigned_by")
-        if active_visit.status not in ["pending", "under_diagnosis", "lab_requested", "radiology_requested", "lab_completed", "radiology_completed", "prescribed"]:
+        if active_visit.status not in [
+            "pending",
+            "under_diagnosis",
+            "lab_requested",
+            "radiology_requested",
+            "lab_completed",
+            "radiology_completed",
+            "prescribed",
+        ]:
             active_visit.status = "pending"
             updated_fields.append("status")
         if updated_fields:
@@ -167,13 +188,18 @@ def build_admin_dashboard_context(request, form=None):
         .order_by("month")
     )
 
-    total_income = Payment.objects.filter(hospital=hospital).aggregate(
-        total=Sum("amount_paid")
-    )["total"] or 0
-    monthly_income = Payment.objects.filter(
-        hospital=hospital,
-        paid_on__gte=last_30_days
-    ).aggregate(total=Sum("amount_paid"))["total"] or 0
+    total_income = (
+        Payment.objects.filter(hospital=hospital).aggregate(total=Sum("amount_paid"))[
+            "total"
+        ]
+        or 0
+    )
+    monthly_income = (
+        Payment.objects.filter(hospital=hospital, paid_on__gte=last_30_days).aggregate(
+            total=Sum("amount_paid")
+        )["total"]
+        or 0
+    )
 
     total_alerts = VitalAlert.objects.filter(patient__hospital=hospital).count()
     critical_open = VitalAlert.objects.filter(
@@ -182,14 +208,14 @@ def build_admin_dashboard_context(request, form=None):
         vital__status="critical",
     ).count()
     escalations = VitalAlert.objects.filter(
-        patient__hospital=hospital,
-        escalated=True
+        patient__hospital=hospital, escalated=True
     ).count()
     resolved_alerts = VitalAlert.objects.filter(
-        patient__hospital=hospital,
-        status="resolved"
+        patient__hospital=hospital, status="resolved"
     ).count()
-    sla_compliance = round((resolved_alerts / total_alerts) * 100, 1) if total_alerts else 100
+    sla_compliance = (
+        round((resolved_alerts / total_alerts) * 100, 1) if total_alerts else 100
+    )
 
     staff_users = CustomUser.objects.filter(hospital=hospital)
     total_staff_count = staff_users.count()
@@ -237,7 +263,9 @@ def build_admin_dashboard_context(request, form=None):
         "critical_open": critical_open,
         "sla_compliance": sla_compliance,
         "escalations": escalations,
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
+        "unread_count": Message.objects.filter(
+            recipient=request.user, is_read=False
+        ).count(),
     }
 
 
@@ -249,19 +277,31 @@ def build_accountant_dashboard_context(user):
     # 1️⃣ Primary Focus: Self-Sponsor (Out-of-Pocket) & Cash Collections
     all_bills = Bill.objects.filter(hospital=hospital).select_related("patient")
     self_bills = all_bills.filter(third_party__isnull=True)
-    
+
     total_billed = all_bills.aggregate(t=Sum("total_amount"))["t"] or 0
     self_sponsor_billed = self_bills.aggregate(t=Sum("patient_payable"))["t"] or 0
-    
+
     # Payments collected
-    all_payments = Payment.objects.filter(hospital=hospital).select_related("bill", "bill__patient")
+    all_payments = Payment.objects.filter(hospital=hospital).select_related(
+        "bill", "bill__patient"
+    )
     total_collections = all_payments.aggregate(p=Sum("amount_paid"))["p"] or 0
-    today_collections = all_payments.filter(paid_on__gte=today_start).aggregate(p=Sum("amount_paid"))["p"] or 0
-    
+    today_collections = (
+        all_payments.filter(paid_on__gte=today_start).aggregate(p=Sum("amount_paid"))[
+            "p"
+        ]
+        or 0
+    )
+
     # Outstanding balances (Self-Sponsor)
     unpaid_self_bills = self_bills.filter(is_fully_paid=False).order_by("-created_at")
-    self_sponsor_unpaid = unpaid_self_bills.aggregate(u=Sum("patient_payable"))["u"] or 0
-    self_sponsor_paid = self_bills.filter(is_fully_paid=True).aggregate(p=Sum("patient_payable"))["p"] or 0
+    self_sponsor_unpaid = (
+        unpaid_self_bills.aggregate(u=Sum("patient_payable"))["u"] or 0
+    )
+    self_sponsor_paid = (
+        self_bills.filter(is_fully_paid=True).aggregate(p=Sum("patient_payable"))["p"]
+        or 0
+    )
 
     # 2️⃣ Secondary Focus: Government & HMO Claims (NHIS & KSCHMA)
     nhis = Payer.objects.filter(code="NHIS").first()
@@ -270,31 +310,69 @@ def build_accountant_dashboard_context(user):
     month_start = today.replace(day=1)
 
     payments = Payment.objects.filter(hospital=hospital)
-    daily_revenue = payments.filter(paid_on__date=today).aggregate(t=Sum("amount_paid"))["t"] or 0
-    mtd_revenue = payments.filter(paid_on__date__gte=month_start, paid_on__date__lte=today).aggregate(t=Sum("amount_paid"))["t"] or 0
+    daily_revenue = (
+        payments.filter(paid_on__date=today).aggregate(t=Sum("amount_paid"))["t"] or 0
+    )
+    mtd_revenue = (
+        payments.filter(
+            paid_on__date__gte=month_start, paid_on__date__lte=today
+        ).aggregate(t=Sum("amount_paid"))["t"]
+        or 0
+    )
     daily_by_method = {
-        "cash": payments.filter(paid_on__date=today, payment_mode="cash").aggregate(t=Sum("amount_paid"))["t"] or 0,
-        "card": payments.filter(paid_on__date=today, payment_mode="card").aggregate(t=Sum("amount_paid"))["t"] or 0,
-        "transfer": payments.filter(paid_on__date=today, payment_mode="transfer").aggregate(t=Sum("amount_paid"))["t"] or 0,
+        "cash": payments.filter(paid_on__date=today, payment_mode="cash").aggregate(
+            t=Sum("amount_paid")
+        )["t"]
+        or 0,
+        "card": payments.filter(paid_on__date=today, payment_mode="card").aggregate(
+            t=Sum("amount_paid")
+        )["t"]
+        or 0,
+        "transfer": payments.filter(
+            paid_on__date=today, payment_mode="transfer"
+        ).aggregate(t=Sum("amount_paid"))["t"]
+        or 0,
     }
 
     government_bills = all_bills.filter(
         third_party__payer_type__in=["federal", "state"],
     ).select_related("third_party")
 
-    nhis_bills = government_bills.filter(patient__patientcoverage__payer=nhis).order_by("-created_at") if nhis else Bill.objects.none()
-    kschma_bills = government_bills.filter(patient__patientcoverage__payer=kschma).order_by("-created_at") if kschma else Bill.objects.none()
+    nhis_bills = (
+        government_bills.filter(patient__patientcoverage__payer=nhis).order_by(
+            "-created_at"
+        )
+        if nhis
+        else Bill.objects.none()
+    )
+    kschma_bills = (
+        government_bills.filter(patient__patientcoverage__payer=kschma).order_by(
+            "-created_at"
+        )
+        if kschma
+        else Bill.objects.none()
+    )
 
     # HMO / Corporate receivables are represented as non-government third party payers.
-    sponsor_bills = Bill.objects.filter(
-        hospital=hospital,
-        third_party__payer_type__in=["private", "hospital"],
-    ).select_related("patient", "third_party").order_by("-created_at")
+    sponsor_bills = (
+        Bill.objects.filter(
+            hospital=hospital,
+            third_party__payer_type__in=["private", "hospital"],
+        )
+        .select_related("patient", "third_party")
+        .order_by("-created_at")
+    )
 
     def bill_totals(qs):
         total = qs.aggregate(t=Sum("third_party_payable"))["t"] or 0
-        paid = qs.filter(is_fully_paid=True).aggregate(p=Sum("third_party_payable"))["p"] or 0
-        unpaid = qs.filter(is_fully_paid=False).aggregate(u=Sum("third_party_payable"))["u"] or 0
+        paid = (
+            qs.filter(is_fully_paid=True).aggregate(p=Sum("third_party_payable"))["p"]
+            or 0
+        )
+        unpaid = (
+            qs.filter(is_fully_paid=False).aggregate(u=Sum("third_party_payable"))["u"]
+            or 0
+        )
         return {
             "total": total,
             "paid": paid,
@@ -310,13 +388,21 @@ def build_accountant_dashboard_context(user):
     )
     patient_receivables = patient_ar_qs.aggregate(t=Sum("patient_due"))["t"] or 0
 
-    third_party_receivables = Bill.objects.filter(
-        hospital=hospital,
-        third_party__isnull=False,
-        is_fully_paid=False,
-    ).aggregate(t=Sum("third_party_payable"))["t"] or 0
+    third_party_receivables = (
+        Bill.objects.filter(
+            hospital=hospital,
+            third_party__isnull=False,
+            is_fully_paid=False,
+        ).aggregate(t=Sum("third_party_payable"))["t"]
+        or 0
+    )
 
-    sponsor_receivables = sponsor_bills.filter(is_fully_paid=False).aggregate(t=Sum("third_party_payable"))["t"] or 0
+    sponsor_receivables = (
+        sponsor_bills.filter(is_fully_paid=False).aggregate(
+            t=Sum("third_party_payable")
+        )["t"]
+        or 0
+    )
 
     return {
         # Primary Self-Sponsor Metrics
@@ -330,7 +416,6 @@ def build_accountant_dashboard_context(user):
         "unpaid_self_count": unpaid_self_bills.count(),
         "recent_bills": all_bills.order_by("-created_at")[:10],
         "recent_payments": all_payments.order_by("-paid_on")[:10],
-        
         # Secondary HMO / Government Metrics
         "nhis": bill_totals(nhis_bills),
         "kschma": bill_totals(kschma_bills),
@@ -342,8 +427,9 @@ def build_accountant_dashboard_context(user):
 
 
 @platform_required
+@platform_required
 def platform_dashboard(request):
-    hospitals = Hospital.objects.all().order_by('name')
+    hospitals = Hospital.objects.all().order_by("name")
     total_hospitals = hospitals.count()
     active_hospitals = hospitals.filter(is_active=True).count()
     expired_hospitals = 0
@@ -352,6 +438,9 @@ def platform_dashboard(request):
     today = timezone.now().date()
 
     for hospital in hospitals:
+        hospital.staff_users = CustomUser.objects.filter(hospital=hospital).order_by("role", "username")
+        hospital.primary_admin = hospital.staff_users.filter(role="admin").first() or hospital.staff_users.first()
+
         try:
             subscription = hospital.subscription
         except ObjectDoesNotExist:
@@ -362,40 +451,50 @@ def platform_dashboard(request):
             expired_hospitals += 1
 
         if subscription:
-            if subscription.plan == 'basic':
+            if subscription.plan == "basic":
                 revenue += 10000
-            elif subscription.plan == 'standard':
+            elif subscription.plan == "standard":
                 revenue += 25000
-            elif subscription.plan == 'premium':
+            elif subscription.plan == "premium":
                 revenue += 50000
 
-    return render(request, 'platform/dashboard.html', {
-        'hospitals': hospitals,
-        'total_hospitals': total_hospitals,
-        'active_hospitals': active_hospitals,
-        'expired_hospitals': expired_hospitals,
-        'revenue': revenue,
-        'today': today,
-    })
+    all_users = CustomUser.objects.select_related("hospital").order_by("hospital__name", "username")
+
+    return render(
+        request,
+        "platform/dashboard.html",
+        {
+            "hospitals": hospitals,
+            "total_hospitals": total_hospitals,
+            "active_hospitals": active_hospitals,
+            "expired_hospitals": expired_hospitals,
+            "revenue": revenue,
+            "today": today,
+            "all_users": all_users,
+        },
+    )
+
 
 @platform_required
 def toggle_hospital(request, hospital_id):
     hospital = get_object_or_404(Hospital, id=hospital_id)
     hospital.is_active = not hospital.is_active
     hospital.save()
-    return redirect('platform_dashboard')
+    return redirect("platform_dashboard")
+
 
 @platform_required
 def create_hospital(request):
-    if request.method == 'POST':
+    if request.method == "POST":
         form = HospitalCreateForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
-            return redirect('platform_dashboard')
+            return redirect("platform_dashboard")
     else:
         form = HospitalCreateForm()
 
-    return render(request, 'platform/create_hospital.html', {'form': form})
+    return render(request, "platform/create_hospital.html", {"form": form})
+
 
 @platform_required
 def view_hospital(request, hospital_id):
@@ -405,33 +504,89 @@ def view_hospital(request, hospital_id):
     except ObjectDoesNotExist:
         subscription = None
 
-    return render(request, 'platform/view_hospital.html', {
-        'hospital': hospital,
-        'subscription': subscription,
-    })
+    users = CustomUser.objects.filter(hospital=hospital).order_by("role", "username")
+
+    return render(
+        request,
+        "platform/view_hospital.html",
+        {
+            "hospital": hospital,
+            "subscription": subscription,
+            "users": users,
+        },
+    )
+
+
+@platform_required
+def platform_reset_user_password(request, user_id):
+    """Platform Admin can reset password for any hospital user or admin."""
+    target_user = get_object_or_404(CustomUser, id=user_id)
+
+    if request.method == "POST":
+        new_password = request.POST.get("new_password", "").strip()
+        confirm_password = request.POST.get("confirm_password", "").strip()
+
+        if not new_password:
+            messages.error(request, "Password cannot be empty.")
+        elif new_password != confirm_password:
+            messages.error(request, "Passwords do not match.")
+        elif len(new_password) < 6:
+            messages.error(request, "Password must be at least 6 characters long.")
+        else:
+            target_user.set_password(new_password)
+            target_user.save()
+            messages.success(
+                request,
+                f"Password for '{target_user.username}' ({target_user.full_name or 'User'}) updated successfully.",
+            )
+
+        redirect_to = request.POST.get("next") or request.META.get("HTTP_REFERER")
+        if redirect_to:
+            return redirect(redirect_to)
+        if target_user.hospital:
+            return redirect("view_hospital", hospital_id=target_user.hospital.id)
+        return redirect("platform_dashboard")
+
+    return render(
+        request,
+        "platform/reset_password.html",
+        {"target_user": target_user},
+    )
+
+
 
 @platform_required
 def edit_hospital(request, hospital_id):
     hospital = get_object_or_404(Hospital, id=hospital_id)
 
-    if request.method == 'POST':
+    if request.method == "POST":
         form = HospitalCreateForm(request.POST, request.FILES, instance=hospital)
         if form.is_valid():
             form.save()
-            return redirect('platform_dashboard')
+            return redirect("platform_dashboard")
     else:
         form = HospitalCreateForm(instance=hospital)
 
-    return render(request, 'platform/edit_hospital.html', {
-        'form': form,
-        'hospital': hospital,
-    })
+    return render(
+        request,
+        "platform/edit_hospital.html",
+        {
+            "form": form,
+            "hospital": hospital,
+        },
+    )
+
 
 @platform_required
 def payment_page(request):
-    return render(request, 'platform/payment.html', {
-        'PAYSTACK_PUBLIC_KEY': settings.PAYSTACK_PUBLIC_KEY,
-    })
+    return render(
+        request,
+        "platform/payment.html",
+        {
+            "PAYSTACK_PUBLIC_KEY": settings.PAYSTACK_PUBLIC_KEY,
+        },
+    )
+
 
 @login_required
 def verify_payment(request, reference):
@@ -447,7 +602,7 @@ def verify_payment(request, reference):
     response = requests.get(url, headers=headers)
     data = response.json()
 
-    if data['status'] and data['data']['status'] == 'success':
+    if data["status"] and data["data"]["status"] == "success":
         # Get hospital via user
         user = request.user
         hospital = user.hospital
@@ -458,22 +613,26 @@ def verify_payment(request, reference):
         Subscription.objects.update_or_create(
             hospital=hospital,
             defaults={
-                'plan': 'standard',
-                'start_date': date.today(),
-                'end_date': date.today() + timedelta(days=30),
-                'is_active': True
-            }
+                "plan": "standard",
+                "start_date": date.today(),
+                "end_date": date.today() + timedelta(days=30),
+                "is_active": True,
+            },
         )
 
-        messages.success(request, "Payment successful! Your subscription has been activated.")
-        return redirect('dashboard')
+        messages.success(
+            request, "Payment successful! Your subscription has been activated."
+        )
+        return redirect("dashboard")
 
     messages.error(request, "Payment verification failed. Please contact support.")
-    return redirect('payment_failed')
+    return redirect("payment_failed")
+
 
 @login_required
 def payment_failed(request):
-    return render(request, 'platform/payment_failed.html')
+    return render(request, "platform/payment_failed.html")
+
 
 # =======================================================
 # DASHBOARD
@@ -485,13 +644,16 @@ from django.shortcuts import render
 from django.utils import timezone
 from datetime import date
 
+
 @login_required
 def dashboard(request):
     user = request.user
-    hospital = getattr(user, 'hospital', None)
-    
+    hospital = getattr(user, "hospital", None)
+
     if not hospital:
-        return render(request, "billing/dashboard.html", {"error": "No hospital assigned"})
+        return render(
+            request, "billing/dashboard.html", {"error": "No hospital assigned"}
+        )
 
     # Common context
     unread_count = Message.objects.filter(recipient=user, is_read=False).count()
@@ -501,74 +663,84 @@ def dashboard(request):
     # NURSE DASHBOARD
     # ==============================
     if user.role == "nurse":
-        active_visits = PatientVisit.objects.filter(
-            hospital=hospital
-        ).exclude(status="completed").select_related("patient", "assigned_doctor")
-        
-        recent_vitals = VitalSign.objects.filter(
-            patient__hospital=hospital
-        ).select_related("patient").order_by("-created_at")[:20]
-        
-        return render(request, "billing/dashboard_nurse.html", {
-            **base_context,
-            "active_visits": active_visits,
-            "recent_vitals": recent_vitals,
-        })
-    
+        active_visits = (
+            PatientVisit.objects.filter(hospital=hospital)
+            .exclude(status="completed")
+            .select_related("patient", "assigned_doctor")
+        )
+
+        recent_vitals = (
+            VitalSign.objects.filter(patient__hospital=hospital)
+            .select_related("patient")
+            .order_by("-created_at")[:20]
+        )
+
+        return render(
+            request,
+            "billing/dashboard_nurse.html",
+            {
+                **base_context,
+                "active_visits": active_visits,
+                "recent_vitals": recent_vitals,
+            },
+        )
 
     # ==============================
     # LAB DASHBOARD
     # ==============================
-    
+
     if user.role == "lab":
 
         today = timezone.localdate()
-    
+
         pending_tests = LabTestRequest.objects.filter(
-            hospital=hospital,
-            status="requested",
-            visit__is_active=True
+            hospital=hospital, status="requested", visit__is_active=True
         )
-    
+
         completed_today = LabTestRequest.objects.filter(
-            hospital=hospital,
-            status="completed",
-            completed_at__date=today
+            hospital=hospital, status="completed", completed_at__date=today
         ).count()
-    
-        return render(request, "billing/dashboard_lab.html", {
-            **base_context,
-            "pending_tests": pending_tests,
-            "pending_count": pending_tests.count(),
-            "completed_today": completed_today
-        })
-    
+
+        return render(
+            request,
+            "billing/dashboard_lab.html",
+            {
+                **base_context,
+                "pending_tests": pending_tests,
+                "pending_count": pending_tests.count(),
+                "completed_today": completed_today,
+            },
+        )
+
     # ==============================
     # RECEPTIONIST DASHBOARD
     # ==============================
-        
+
     if user.role == "radiologist":
 
         today = timezone.localdate()
-    
+
         pending_scans = RadiologyRequest.objects.filter(
-            hospital=hospital,
-            status="requested"
+            hospital=hospital, status="requested"
         ).select_related("visit__patient", "doctor")
-    
+
         completed_today = RadiologyRequest.objects.filter(
-            hospital=hospital,
-            status="completed",
-            completed_at__date=today
+            hospital=hospital, status="completed", completed_at__date=today
         ).count()
-    
-        return render(request, "billing/dashboard_radiologist.html", {
-            **base_context,
-            "pending_scans": pending_scans,
-            "total_scans": RadiologyRequest.objects.filter(hospital=hospital).count(),
-            "pending_reports": pending_scans.count(),
-            "completed_today": completed_today
-        })
+
+        return render(
+            request,
+            "billing/dashboard_radiologist.html",
+            {
+                **base_context,
+                "pending_scans": pending_scans,
+                "total_scans": RadiologyRequest.objects.filter(
+                    hospital=hospital
+                ).count(),
+                "pending_reports": pending_scans.count(),
+                "completed_today": completed_today,
+            },
+        )
 
     # ==============================
     # PHARMACIST DASHBOARD
@@ -596,17 +768,16 @@ def dashboard(request):
                 "today_dispensed": today_dispensed,
             },
         )
-    
+
     # ==============================
     # RECEPTIONIST DASHBOARD
     # ==============================
-   
+
     if user.role == "receptionist":
         today = date.today()
-    
+
         today_appointments_qs = Appointment.objects.filter(
-            hospital=hospital,
-            date=today
+            hospital=hospital, date=today
         )
 
         checked_in_patient_ids = set(
@@ -619,30 +790,25 @@ def dashboard(request):
             .values_list("patient_id", flat=True)
         )
         walkins = today_appointments_qs.filter(is_walk_in=True).count()
-    
-        return render(request, "billing/dashboard_receptionist.html", {
-            **base_context,
-    
-            "total_patients": Patient.objects.filter(hospital=hospital).count(),
-    
-            "today_appointments": today_appointments_qs.count(),
-    
-            "new_patients": Patient.objects.filter(
-                hospital=hospital,
-                created_at__date=today
-            ).count(),
-    
-            "checked_in": len(checked_in_patient_ids),
-    
-            "walkins": walkins,
-    
-            "unread_messages": unread_count,
-    
-            "today_appointments_list": today_appointments_qs.select_related(
-                "patient",
-                "doctor"
-            ).order_by("time"),
-        })
+
+        return render(
+            request,
+            "billing/dashboard_receptionist.html",
+            {
+                **base_context,
+                "total_patients": Patient.objects.filter(hospital=hospital).count(),
+                "today_appointments": today_appointments_qs.count(),
+                "new_patients": Patient.objects.filter(
+                    hospital=hospital, created_at__date=today
+                ).count(),
+                "checked_in": len(checked_in_patient_ids),
+                "walkins": walkins,
+                "unread_messages": unread_count,
+                "today_appointments_list": today_appointments_qs.select_related(
+                    "patient", "doctor"
+                ).order_by("time"),
+            },
+        )
 
     # ==============================
     # DOCTOR DASHBOARD
@@ -685,29 +851,45 @@ def dashboard(request):
 
         if query:
             patients = patients.filter(
-                Q(full_name__icontains=query) |
-                Q(phone_number__icontains=query) |
-                Q(id__iexact=query)
+                Q(full_name__icontains=query)
+                | Q(phone_number__icontains=query)
+                | Q(id__iexact=query)
             )
 
-        active_visits = PatientVisit.objects.filter(
-            hospital=hospital,
-            assigned_doctor=user,
-            is_active=True,
-        ).exclude(status="completed").select_related("patient")
+        active_visits = (
+            PatientVisit.objects.filter(
+                hospital=hospital,
+                assigned_doctor=user,
+                is_active=True,
+            )
+            .exclude(status="completed")
+            .select_related("patient")
+        )
 
-        queue = PatientVisit.objects.filter(
-            hospital=hospital,
-            assigned_doctor=user,
-            is_active=True,
-            status__in=["pending", "under_diagnosis"],
-            created_at__date=today,
-        ).select_related("patient").order_by("-is_emergency", "created_at")
+        queue = (
+            PatientVisit.objects.filter(
+                hospital=hospital,
+                assigned_doctor=user,
+                is_active=True,
+                status__in=["pending", "under_diagnosis"],
+                created_at__date=today,
+            )
+            .select_related("patient")
+            .order_by("-is_emergency", "created_at")
+        )
 
-        doctor_prescriptions = Prescription.objects.filter(hospital=hospital, doctor=user)
+        doctor_prescriptions = Prescription.objects.filter(
+            hospital=hospital, doctor=user
+        )
         prescriptions_issued = doctor_prescriptions.count()
-        prescriptions_dispensed = doctor_prescriptions.filter(status="dispensed").count()
-        completion_rate = round((prescriptions_dispensed / prescriptions_issued) * 100) if prescriptions_issued else 0
+        prescriptions_dispensed = doctor_prescriptions.filter(
+            status="dispensed"
+        ).count()
+        completion_rate = (
+            round((prescriptions_dispensed / prescriptions_issued) * 100)
+            if prescriptions_issued
+            else 0
+        )
         today_appointments = Appointment.objects.filter(
             hospital=hospital,
             doctor=user,
@@ -716,23 +898,27 @@ def dashboard(request):
             time__gte=now_time,
         ).select_related("patient")
 
-        return render(request, "billing/dashboard_doctor.html", {
-            **base_context,
-            "patients": patients[:50],
-            "doctor_patient_count": patients.count(),
-            "visits_last_30": PatientVisit.objects.filter(
-                hospital=hospital,
-                assigned_doctor=user,
-                created_at__gte=last_30_days,
-            ).count(),
-            "prescriptions_issued": prescriptions_issued,
-            "prescriptions_dispensed": prescriptions_dispensed,
-            "completion_rate": completion_rate,
-            "active_visits": active_visits,
-            "queue": queue,
-            "today_appointments": today_appointments,
-        })
-        
+        return render(
+            request,
+            "billing/dashboard_doctor.html",
+            {
+                **base_context,
+                "patients": patients[:50],
+                "doctor_patient_count": patients.count(),
+                "visits_last_30": PatientVisit.objects.filter(
+                    hospital=hospital,
+                    assigned_doctor=user,
+                    created_at__gte=last_30_days,
+                ).count(),
+                "prescriptions_issued": prescriptions_issued,
+                "prescriptions_dispensed": prescriptions_dispensed,
+                "completion_rate": completion_rate,
+                "active_visits": active_visits,
+                "queue": queue,
+                "today_appointments": today_appointments,
+            },
+        )
+
     # ==============================
     # ADMIN DASHBOARD
     # ==============================
@@ -754,13 +940,15 @@ def dashboard(request):
         "radiologist": "billing/dashboard_radiologist.html",
         "pharmacist": "billing/pharmacist_dashboard.html",
     }
-    
+
     template = template_map.get(user.role, "billing/dashboard.html")
     return render(request, template, base_context)
-        
+
+
 # =======================================================
 # HOME & ROLE REDIRECT
 # =======================================================
+
 
 def home(request):
     return render(request, "home.html")
@@ -801,6 +989,7 @@ def demo_signup(request):
 
             # Create hospital + subscription trial
             from datetime import date, timedelta
+
             hospital = Hospital.objects.create(
                 name=hospital_name,
                 slug=_unique_hospital_slug(hospital_name),
@@ -859,27 +1048,34 @@ def redirect_by_role(request):
 # PATIENT MANAGEMENT
 # =======================================================
 
+
 @login_required
 @login_required
 def patient_list(request):
     query = request.GET.get("q", "")
-    patients = Patient.objects.filter(hospital=request.user.hospital).order_by("full_name")
+    patients = Patient.objects.filter(hospital=request.user.hospital).order_by(
+        "full_name"
+    )
     if query:
         # Search by name, phone number, or patient ID
         patients = patients.filter(
-            Q(full_name__icontains=query) |
-            Q(phone_number__icontains=query) |
-            Q(id__iexact=query)
+            Q(full_name__icontains=query)
+            | Q(phone_number__icontains=query)
+            | Q(id__iexact=query)
         )
     active_visit_patient_ids = set(
         PatientVisit.objects.filter(
             hospital=request.user.hospital,
             is_active=True,
-        ).exclude(status="completed").values_list("patient_id", flat=True)
+        )
+        .exclude(status="completed")
+        .values_list("patient_id", flat=True)
     )
     for patient in patients:
         patient.active_visit = patient.id in active_visit_patient_ids
-    return render(request, "billing/patient_list.html", {"patients": patients, "query": query})
+    return render(
+        request, "billing/patient_list.html", {"patients": patients, "query": query}
+    )
 
 
 @login_required
@@ -888,11 +1084,15 @@ def check_patient(request, patient_id):
     if not request.user.is_receptionist() and not request.user.is_admin():
         return redirect("patient_emr", patient_id=patient.id)
 
-    active_visit = PatientVisit.objects.filter(
-        patient=patient,
-        hospital=request.user.hospital,
-        is_active=True,
-    ).exclude(status="completed").first()
+    active_visit = (
+        PatientVisit.objects.filter(
+            patient=patient,
+            hospital=request.user.hospital,
+            is_active=True,
+        )
+        .exclude(status="completed")
+        .first()
+    )
 
     return render(
         request,
@@ -941,7 +1141,7 @@ def register_patient(request):
 
     if request.method == "POST":
         # ensure patient is linked to the user's hospital
-        if not getattr(request.user, 'hospital', None):
+        if not getattr(request.user, "hospital", None):
             messages.error(request, "You are not linked to a hospital.")
             return redirect("receptionist_dashboard")
 
@@ -975,7 +1175,7 @@ def register_patient(request):
             patient_percentage=patient_percentage,
             government_percentage=government_percentage,
             approved_by=request.user,
-            notes=request.POST.get("coverage_notes", "")
+            notes=request.POST.get("coverage_notes", ""),
         )
 
         return redirect("receptionist_dashboard")
@@ -1000,10 +1200,10 @@ def user_profile(request):
     return render(request, "billing/user_profile.html", {"form": form, "user": user})
 
 
-
 # =======================================================
 # APPOINTMENTS
 # =======================================================
+
 
 @login_required
 def appointment_list(request):
@@ -1016,13 +1216,19 @@ def appointment_list(request):
     appointments = Appointment.objects.filter(hospital=hospital)
     if query:
         appointments = appointments.filter(
-            Q(patient__full_name__icontains=query) |
-            Q(patient__phone_number__icontains=query) |
-            Q(patient__id__iexact=query) |
-            Q(reason__icontains=query)
+            Q(patient__full_name__icontains=query)
+            | Q(patient__phone_number__icontains=query)
+            | Q(patient__id__iexact=query)
+            | Q(reason__icontains=query)
         )
-    appointments = appointments.select_related("patient", "doctor").order_by("-date", "-time")
-    return render(request, "billing/appointment_list.html", {"appointments": appointments, "query": query})
+    appointments = appointments.select_related("patient", "doctor").order_by(
+        "-date", "-time"
+    )
+    return render(
+        request,
+        "billing/appointment_list.html",
+        {"appointments": appointments, "query": query},
+    )
 
 
 @login_required
@@ -1086,33 +1292,46 @@ def create_appointment(request):
 # BILLING & PAYMENTS
 # =======================================================
 
+
 @login_required
 def bill_list(request):
     hospital = request.user.hospital
     if request.user.role in ["accountant", "admin"]:
         bills = Bill.objects.filter(hospital=hospital)
     elif request.user.role == "receptionist":
-        bills = Bill.objects.filter(hospital=hospital, bill_type="front_desk", created_by=request.user)
+        bills = Bill.objects.filter(
+            hospital=hospital, bill_type="front_desk", created_by=request.user
+        )
     elif request.user.role == "pharmacist":
-        bills = Bill.objects.filter(hospital=hospital, bill_type="pharmacy", created_by=request.user)
+        bills = Bill.objects.filter(
+            hospital=hospital, bill_type="pharmacy", created_by=request.user
+        )
     else:
         bills = Bill.objects.none()
 
-    bills = bills.select_related('patient').order_by('-created_at')
+    bills = bills.select_related("patient").order_by("-created_at")
     return render(request, "billing/bill_list.html", {"bills": bills})
+
 
 @login_required
 def create_bill_index(request):
     if not user_can_create_front_desk_bill(request.user):
-        messages.error(request, "Only receptionists and administrators may create front desk bills.")
+        messages.error(
+            request,
+            "Only receptionists and administrators may create front desk bills.",
+        )
         return redirect("dashboard")
     messages.info(request, "Please select a patient to create a front desk bill.")
     return redirect("patient_list")
 
+
 @login_required
 def create_bill(request, patient_id):
     if not user_can_create_front_desk_bill(request.user):
-        messages.error(request, "Only receptionists and administrators may create front desk bills.")
+        messages.error(
+            request,
+            "Only receptionists and administrators may create front desk bills.",
+        )
         return redirect("dashboard")
 
     patient = hospital_scoped_or_404(Patient, request.user, id=patient_id)
@@ -1125,19 +1344,31 @@ def create_bill(request, patient_id):
         service_ids = request.POST.getlist("service")
 
         for service_id in service_ids:
-            service = get_object_or_404(Service, id=service_id, hospital=patient.hospital)
+            service = get_object_or_404(
+                Service, id=service_id, hospital=patient.hospital
+            )
             qty = int(request.POST.get(f"quantity_{service_id}", 1))
             if qty <= 0:
                 qty = 1
             subtotal = service.price * qty
             total += subtotal
-            items_data.append({"service": service, "quantity": qty, "subtotal": subtotal})
+            items_data.append(
+                {"service": service, "quantity": qty, "subtotal": subtotal}
+            )
 
         if not items_data:
-            messages.error(request, "Please select at least one service before generating a bill.")
-            return render(request, "billing/create_bill.html", {"patient": patient, "services": services, "coverage": coverage})
+            messages.error(
+                request, "Please select at least one service before generating a bill."
+            )
+            return render(
+                request,
+                "billing/create_bill.html",
+                {"patient": patient, "services": services, "coverage": coverage},
+            )
 
-        patient_payable, third_party_payable, third_party = calculate_bill_split(patient, total)
+        patient_payable, third_party_payable, third_party = calculate_bill_split(
+            patient, total
+        )
 
         bill = Bill.objects.create(
             patient=patient,
@@ -1149,7 +1380,13 @@ def create_bill(request, patient_id):
             third_party=third_party,
             bill_type="front_desk",
         )
-        log_action(request.user, "create", "Bill", bill.id, f"Created bill of {total} for {patient}")
+        log_action(
+            request.user,
+            "create",
+            "Bill",
+            bill.id,
+            f"Created bill of {total} for {patient}",
+        )
 
         for item in items_data:
             BillItem.objects.create(
@@ -1175,7 +1412,9 @@ def create_bill(request, patient_id):
 @login_required
 def create_pharmacy_bill(request, patient_id):
     if not user_can_create_pharmacy_bill(request.user):
-        messages.error(request, "Only pharmacists and administrators may create pharmacy bills.")
+        messages.error(
+            request, "Only pharmacists and administrators may create pharmacy bills."
+        )
         return redirect("dashboard")
 
     patient = hospital_scoped_or_404(Patient, request.user, id=patient_id)
@@ -1187,19 +1426,32 @@ def create_pharmacy_bill(request, patient_id):
         medicine_ids = request.POST.getlist("medicine")
 
         for medicine_id in medicine_ids:
-            medicine = get_object_or_404(Medicine, id=medicine_id, hospital=patient.hospital)
+            medicine = get_object_or_404(
+                Medicine, id=medicine_id, hospital=patient.hospital
+            )
             qty = int(request.POST.get(f"quantity_{medicine_id}", 1))
             if qty <= 0:
                 qty = 1
             subtotal = medicine.price * qty
             total += subtotal
-            items_data.append({"medicine": medicine, "quantity": qty, "subtotal": subtotal})
+            items_data.append(
+                {"medicine": medicine, "quantity": qty, "subtotal": subtotal}
+            )
 
         if not items_data:
-            messages.error(request, "Please select at least one medicine before generating a pharmacy bill.")
-            return render(request, "billing/create_pharmacy_bill.html", {"patient": patient, "medicines": medicines, "coverage": coverage})
+            messages.error(
+                request,
+                "Please select at least one medicine before generating a pharmacy bill.",
+            )
+            return render(
+                request,
+                "billing/create_pharmacy_bill.html",
+                {"patient": patient, "medicines": medicines, "coverage": coverage},
+            )
 
-        patient_payable, third_party_payable, third_party = calculate_bill_split(patient, total)
+        patient_payable, third_party_payable, third_party = calculate_bill_split(
+            patient, total
+        )
 
         bill = Bill.objects.create(
             patient=patient,
@@ -1211,7 +1463,13 @@ def create_pharmacy_bill(request, patient_id):
             third_party=third_party,
             bill_type="pharmacy",
         )
-        log_action(request.user, "create", "Bill", bill.id, f"Created pharmacy bill of {total} for {patient}")
+        log_action(
+            request.user,
+            "create",
+            "Bill",
+            bill.id,
+            f"Created pharmacy bill of {total} for {patient}",
+        )
 
         for item in items_data:
             BillItem.objects.create(
@@ -1223,11 +1481,15 @@ def create_pharmacy_bill(request, patient_id):
 
         return redirect("view_invoice", bill_id=bill.id)
 
-    return render(request, "billing/create_pharmacy_bill.html", {
-        "patient": patient,
-        "medicines": medicines,
-        "coverage": coverage,
-    })
+    return render(
+        request,
+        "billing/create_pharmacy_bill.html",
+        {
+            "patient": patient,
+            "medicines": medicines,
+            "coverage": coverage,
+        },
+    )
 
 
 @login_required
@@ -1271,7 +1533,9 @@ def download_invoice_pdf(request, bill_id):
         return HttpResponse("PDF generation error", status=500)
 
     response = HttpResponse(buffer, content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="invoice_{bill.invoice_no}.pdf"'
+    response["Content-Disposition"] = (
+        f'attachment; filename="invoice_{bill.invoice_no}.pdf"'
+    )
     return response
 
 
@@ -1279,7 +1543,9 @@ def download_invoice_pdf(request, bill_id):
 def record_payment(request, bill_id):
     bill = hospital_scoped_or_404(Bill, request.user, id=bill_id)
     if not user_can_record_payment(request.user):
-        messages.error(request, "Only accountants and administrators may record final payments.")
+        messages.error(
+            request, "Only accountants and administrators may record final payments."
+        )
         return redirect("dashboard")
 
     if request.method == "POST":
@@ -1293,7 +1559,7 @@ def record_payment(request, bill_id):
         )
 
         # Update bill status — only consider the patient's portion
-        total_paid = bill.payment_set.aggregate(total=Sum('amount_paid'))['total'] or 0
+        total_paid = bill.payment_set.aggregate(total=Sum("amount_paid"))["total"] or 0
         if total_paid >= bill.patient_payable:
             bill.is_fully_paid = True
             bill.is_finalized = True
@@ -1310,10 +1576,11 @@ def record_payment(request, bill_id):
 # REPORTS & AUDIT LOGS
 # =======================================================
 
+
 @login_required
 def income_report(request):
     hospital_filter = {}
-    if hasattr(request.user, 'hospital') and request.user.hospital:
+    if hasattr(request.user, "hospital") and request.user.hospital:
         hospital_filter = {"hospital": request.user.hospital}
 
     payments = Payment.objects.filter(**hospital_filter).order_by("-paid_on")
@@ -1331,7 +1598,12 @@ def income_report(request):
     return render(
         request,
         "billing/income_report.html",
-        {"payments": payments, "total_income": total_income, "labels": labels, "data": data},
+        {
+            "payments": payments,
+            "total_income": total_income,
+            "labels": labels,
+            "data": data,
+        },
     )
 
 
@@ -1379,10 +1651,7 @@ def compose_message(request):
     initial_data = {}
 
     if to_user_id:
-        recipient = User.objects.filter(
-            id=to_user_id,
-            hospital=hospital
-        ).first()
+        recipient = User.objects.filter(id=to_user_id, hospital=hospital).first()
         if recipient:
             initial_data["recipient"] = recipient
 
@@ -1404,25 +1673,20 @@ def compose_message(request):
 
     return render(request, "billing/messages/compose.html", {"form": form})
 
+
 @login_required
 def inbox(request):
     hospital = request.hospital
 
     subquery = (
-        Message.objects.filter(
-            hospital=hospital,
-            recipient=request.user
-        )
+        Message.objects.filter(hospital=hospital, recipient=request.user)
         .values("sender")
         .annotate(latest_id=Max("id"))
         .values_list("latest_id", flat=True)
     )
 
     messages = (
-        Message.objects.filter(
-            id__in=subquery,
-            hospital=hospital
-        )
+        Message.objects.filter(id__in=subquery, hospital=hospital)
         .select_related("sender")
         .order_by("-timestamp")
     )
@@ -1434,11 +1698,7 @@ def inbox(request):
 def conversation(request, sender_id):
     hospital = request.hospital
 
-    sender = get_object_or_404(
-        User,
-        id=sender_id,
-        hospital=hospital
-    )
+    sender = get_object_or_404(User, id=sender_id, hospital=hospital)
 
     if request.method == "POST":
         body = request.POST.get("body", "").strip()
@@ -1452,18 +1712,17 @@ def conversation(request, sender_id):
             )
             return redirect("conversation", sender_id=sender.id)
 
-    msgs = Message.objects.filter(
-        hospital=hospital
-    ).filter(
-        Q(sender=request.user, recipient=sender) |
-        Q(sender=sender, recipient=request.user)
-    ).order_by("timestamp")
+    msgs = (
+        Message.objects.filter(hospital=hospital)
+        .filter(
+            Q(sender=request.user, recipient=sender)
+            | Q(sender=sender, recipient=request.user)
+        )
+        .order_by("timestamp")
+    )
 
     Message.objects.filter(
-        hospital=hospital,
-        sender=sender,
-        recipient=request.user,
-        is_read=False
+        hospital=hospital, sender=sender, recipient=request.user, is_read=False
     ).update(is_read=True)
 
     return render(
@@ -1478,8 +1737,7 @@ def sent_messages(request):
     hospital = request.hospital
 
     messages_sent = Message.objects.filter(
-        hospital=hospital,
-        sender=request.user
+        hospital=hospital, sender=request.user
     ).order_by("-timestamp")
 
     return render(
@@ -1493,11 +1751,7 @@ def sent_messages(request):
 def message_detail(request, pk):
     hospital = request.hospital
 
-    message = get_object_or_404(
-        Message,
-        id=pk,
-        hospital=hospital
-    )
+    message = get_object_or_404(Message, id=pk, hospital=hospital)
 
     # 🔒 Must be sender or recipient
     if message.sender != request.user and message.recipient != request.user:
@@ -1507,11 +1761,7 @@ def message_detail(request, pk):
         message.is_read = True
         message.save(update_fields=["is_read"])
 
-    return render(
-        request,
-        "billing/messages/message_detail.html",
-        {"message": message}
-    )
+    return render(request, "billing/messages/message_detail.html", {"message": message})
 
 
 # =======================================================
@@ -1521,21 +1771,17 @@ def message_detail(request, pk):
 # 🩺 PATIENT EMR & MEDICAL RECORDS
 # =======================================================
 
+
 @login_required
 def patient_emr(request, patient_id):
 
-    patient = get_object_or_404(
-        Patient,
-        id=patient_id,
-        hospital=request.user.hospital
-    )
+    patient = get_object_or_404(Patient, id=patient_id, hospital=request.user.hospital)
 
     # ==============================
     # VISITS (hospital isolated)
     # ==============================
     visits = PatientVisit.objects.filter(
-        patient=patient,
-        hospital=request.user.hospital
+        patient=patient, hospital=request.user.hospital
     ).order_by("-created_at", "-id")
 
     # Active visit
@@ -1543,66 +1789,72 @@ def patient_emr(request, patient_id):
 
     if visit_id:
         active_visit = get_object_or_404(
-            PatientVisit,
-            id=visit_id,
-            patient=patient,
-            hospital=request.user.hospital
+            PatientVisit, id=visit_id, patient=patient, hospital=request.user.hospital
         )
     else:
-        active_visit = visits.filter(
-            is_active=True
-        ).exclude(
-            status="completed"
-        ).first()
+        active_visit = visits.filter(is_active=True).exclude(status="completed").first()
 
     # ==============================
     # LAB + RADIOLOGY (UPDATED MODELS)
     # ==============================
-    lab_tests = LabTestRequest.objects.filter(
-        visit__patient=patient,
-        hospital=request.user.hospital
-    ).select_related("visit", "doctor").order_by("-requested_at")
+    lab_tests = (
+        LabTestRequest.objects.filter(
+            visit__patient=patient, hospital=request.user.hospital
+        )
+        .select_related("visit", "doctor")
+        .order_by("-requested_at")
+    )
 
-    lab_reports = LabReport.objects.filter(
-        patient=patient
-    ).select_related("lab_technician").order_by("-date")
+    lab_reports = (
+        LabReport.objects.filter(patient=patient)
+        .select_related("lab_technician")
+        .order_by("-date")
+    )
 
-    radiology_requests = RadiologyRequest.objects.filter(
-        visit__patient=patient,
-        hospital=request.user.hospital
-    ).select_related("visit", "doctor").order_by("-requested_at")
+    radiology_requests = (
+        RadiologyRequest.objects.filter(
+            visit__patient=patient, hospital=request.user.hospital
+        )
+        .select_related("visit", "doctor")
+        .order_by("-requested_at")
+    )
 
-    radiology_reports = RadiologyReport.objects.filter(
-        patient=patient
-    ).select_related("radiologist").order_by("-created_at")
+    radiology_reports = (
+        RadiologyReport.objects.filter(patient=patient)
+        .select_related("radiologist")
+        .order_by("-created_at")
+    )
 
     # ==============================
     # NOTES / RECORDS
     # ==============================
     medical_records = MedicalRecord.objects.filter(
-        patient=patient,
-        patient__hospital=request.user.hospital
+        patient=patient, patient__hospital=request.user.hospital
     ).order_by("-created_at")
 
-    notes = ConsultationNote.objects.filter(
-        patient=patient
-    ).order_by("-created_at")
+    notes = ConsultationNote.objects.filter(patient=patient).order_by("-created_at")
 
     # ==============================
     # PRESCRIPTIONS
     # ==============================
-    prescriptions = Prescription.objects.filter(
-        visit__patient=patient,
-        hospital=request.user.hospital
-    ).select_related("doctor", "visit").order_by("-issued_at")
+    prescriptions = (
+        Prescription.objects.filter(
+            visit__patient=patient, hospital=request.user.hospital
+        )
+        .select_related("doctor", "visit")
+        .order_by("-issued_at")
+    )
 
     # ==============================
     # VITAL SIGNS
     # ==============================
-    vital_signs = VitalSign.objects.filter(
-        patient=patient,
-        patient__hospital=request.user.hospital
-    ).select_related("recorded_by").order_by("-created_at")[:30]
+    vital_signs = (
+        VitalSign.objects.filter(
+            patient=patient, patient__hospital=request.user.hospital
+        )
+        .select_related("recorded_by")
+        .order_by("-created_at")[:30]
+    )
 
     latest_vitals = vital_signs.first()
     vitals_status = evaluate_vitals(latest_vitals) if latest_vitals else {}
@@ -1613,15 +1865,17 @@ def patient_emr(request, patient_id):
     alert = None
     if alert_id := request.GET.get("alert"):
         alert = VitalAlert.objects.filter(
-            id=alert_id,
-            patient=patient,
-            patient__hospital=request.user.hospital
+            id=alert_id, patient=patient, patient__hospital=request.user.hospital
         ).first()
 
-    vital_alerts = VitalAlert.objects.filter(
-        patient=patient,
-        patient__hospital=request.user.hospital
-    ).exclude(status="resolved").prefetch_related("logs__performed_by").order_by("-created_at")
+    vital_alerts = (
+        VitalAlert.objects.filter(
+            patient=patient, patient__hospital=request.user.hospital
+        )
+        .exclude(status="resolved")
+        .prefetch_related("logs__performed_by")
+        .order_by("-created_at")
+    )
 
     latest_medical_record = medical_records.first()
     latest_note = notes.first()
@@ -1643,17 +1897,13 @@ def patient_emr(request, patient_id):
         "patient": patient,
         "visits": visits,
         "active_visit": active_visit,
-
         "medical_records": medical_records,
         "notes": notes,
-
         "lab_tests": lab_tests,
         "lab_reports": lab_reports,
         "radiology_requests": radiology_requests,
         "radiology_reports": radiology_reports,
-
         "prescriptions": prescriptions,
-
         "vital_signs": vital_signs,
         "latest_vitals": latest_vitals,
         "vitals_status": vitals_status,
@@ -1662,60 +1912,64 @@ def patient_emr(request, patient_id):
         "latest_medical_record": latest_medical_record,
         "latest_note": latest_note,
         "summary": summary,
-
         "unread_count": Message.objects.filter(
-            recipient=request.user,
-            is_read=False
+            recipient=request.user, is_read=False
         ).count(),
     }
 
     return render(request, "billing/patient_emr.html", context)
 
+
 @login_required
 def patient_history(request, patient_id):
     """Historical medical records for a patient with optimized database hits"""
-    patient = get_object_or_404(
-        Patient, 
-        id=patient_id, 
-        hospital=request.user.hospital
-    )
-    
+    patient = get_object_or_404(Patient, id=patient_id, hospital=request.user.hospital)
+
     # Using select_related('doctor') makes the template load much faster
     # because it fetches the doctor's name in the same query.
-    history = MedicalRecord.objects.filter(
-        patient=patient,
-        patient__hospital=request.user.hospital
-    ).select_related('doctor').order_by("-created_at")
-    
+    history = (
+        MedicalRecord.objects.filter(
+            patient=patient, patient__hospital=request.user.hospital
+        )
+        .select_related("doctor")
+        .order_by("-created_at")
+    )
+
     unread_messages = Message.objects.filter(
-        recipient=request.user, 
-        is_read=False
+        recipient=request.user, is_read=False
     ).count()
 
-    return render(request, "billing/patient_history.html", {
-        "patient": patient,
-        "history": history,
-        "unread_count": unread_messages,
-    })
+    return render(
+        request,
+        "billing/patient_history.html",
+        {
+            "patient": patient,
+            "history": history,
+            "unread_count": unread_messages,
+        },
+    )
+
 
 @login_required
 def add_medical_record(request, patient_id):
     """Add clinical note with optional vital alert resolution"""
     # Check role (using .role or .is_doctor depending on your model)
-    is_doctor = getattr(request.user, 'role', '') == 'doctor' or (hasattr(request.user, 'is_doctor') and request.user.is_doctor())
-    
+    is_doctor = getattr(request.user, "role", "") == "doctor" or (
+        hasattr(request.user, "is_doctor") and request.user.is_doctor()
+    )
+
     if not is_doctor:
         messages.error(request, "Only doctors can add medical notes.")
         return redirect("patient_emr", patient_id=patient_id)
-    
+
     patient = get_object_or_404(Patient, id=patient_id, hospital=request.user.hospital)
-    
+
     if request.method == "POST":
         title = request.POST.get("title", "").strip()
         notes = request.POST.get("notes", "").strip()
         alert_id = request.POST.get("alert_id")
         visit_id = request.POST.get("visit_id")
-        
+
         if not title or not notes:
             messages.error(request, "Title and notes are required.")
             return redirect("patient_emr", patient_id=patient.id)
@@ -1728,8 +1982,8 @@ def add_medical_record(request, patient_id):
                 patient=patient,
                 hospital=request.user.hospital,
             )
-        
-        # Create medical record 
+
+        # Create medical record
         MedicalRecord.objects.create(
             patient=patient,
             visit=visit,
@@ -1737,33 +1991,32 @@ def add_medical_record(request, patient_id):
             notes=notes,
             note_type="doctor_note",
             diagnosis=title,
-            treatment="See notes"
+            treatment="See notes",
         )
-        
+
         # Resolve alert if linked
         if alert_id:
             alert = VitalAlert.objects.filter(
-                id=alert_id,
-                patient=patient,
-                patient__hospital=request.user.hospital
+                id=alert_id, patient=patient, patient__hospital=request.user.hospital
             ).first()
-            
+
             if alert:
                 alert.status = "resolved"
                 alert.resolved_at = timezone.now()
                 alert.save()
-                
+
                 VitalAlertLog.objects.create(
                     alert=alert,
                     action="resolved",
                     performed_by=request.user,
-                    notes="Resolved via consultation note"
+                    notes="Resolved via consultation note",
                 )
-        
+
         messages.success(request, "Medical note added successfully.")
         return redirect("patient_emr", patient_id=patient.id)
-    
+
     return redirect("patient_emr", patient_id=patient_id)
+
 
 @login_required
 def add_doctor_note(request, patient_id):
@@ -1771,24 +2024,30 @@ def add_doctor_note(request, patient_id):
     if not request.user.is_doctor():
         messages.error(request, "Only doctors can add notes.")
         return redirect("patient_emr", patient_id=patient_id)
-    
+
     patient = get_object_or_404(Patient, id=patient_id, hospital=request.user.hospital)
-    visits = PatientVisit.objects.filter(
-        patient=patient,
-        hospital=request.user.hospital,
-        is_active=True,
-    ).exclude(status="completed").order_by("-created_at")
-    
+    visits = (
+        PatientVisit.objects.filter(
+            patient=patient,
+            hospital=request.user.hospital,
+            is_active=True,
+        )
+        .exclude(status="completed")
+        .order_by("-created_at")
+    )
+
     if request.method == "POST":
         visit_id = request.POST.get("visit_id")
         notes = request.POST.get("notes", "").strip()
-        
+
         if not notes:
             messages.error(request, "Notes cannot be empty.")
             return redirect("add_doctor_note", patient_id=patient.id)
-        
-        visit = get_object_or_404(PatientVisit, id=visit_id, patient=patient, hospital=request.user.hospital)
-        
+
+        visit = get_object_or_404(
+            PatientVisit, id=visit_id, patient=patient, hospital=request.user.hospital
+        )
+
         MedicalRecord.objects.create(
             patient=patient,
             visit=visit,
@@ -1798,15 +2057,21 @@ def add_doctor_note(request, patient_id):
             diagnosis="Doctor Note",
             treatment="See notes",
         )
-        
+
         messages.success(request, "Doctor note added successfully.")
         return redirect("patient_emr", patient_id=patient.id)
-    
-    return render(request, "billing/doctor_note_add.html", {
-        "patient": patient,
-        "visits": visits,
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
-    })
+
+    return render(
+        request,
+        "billing/doctor_note_add.html",
+        {
+            "patient": patient,
+            "visits": visits,
+            "unread_count": Message.objects.filter(
+                recipient=request.user, is_read=False
+            ).count(),
+        },
+    )
 
 
 @login_required
@@ -1815,9 +2080,9 @@ def add_emr_note(request, patient_id):
     if not request.user.is_doctor():
         messages.error(request, "Only doctors can add notes.")
         return redirect("patient_emr", patient_id=patient_id)
-    
+
     patient = get_object_or_404(Patient, id=patient_id, hospital=request.user.hospital)
-    
+
     if request.method == "POST":
         notes = request.POST.get("notes", "").strip()
         if notes:
@@ -1840,7 +2105,7 @@ def add_emr_note(request, patient_id):
                 treatment="See notes",
             )
             messages.success(request, "Doctor note added.")
-    
+
     return redirect("patient_emr", patient_id=patient.id)
 
 
@@ -1848,26 +2113,32 @@ def add_emr_note(request, patient_id):
 def export_emr_pdf(request, patient_id):
     """Generate printable PDF of complete patient EMR"""
     patient = get_object_or_404(Patient, id=patient_id, hospital=request.user.hospital)
-    
+
     context = {
         "patient": patient,
-        "medical_records": MedicalRecord.objects.filter(patient=patient).order_by("-created_at"),
-       "lab_tests": LabTestRequest.objects.filter(
-            visit__patient=patient
-        ).order_by("-requested_at"),
-        
+        "medical_records": MedicalRecord.objects.filter(patient=patient).order_by(
+            "-created_at"
+        ),
+        "lab_tests": LabTestRequest.objects.filter(visit__patient=patient).order_by(
+            "-requested_at"
+        ),
         "radiology_requests": RadiologyRequest.objects.filter(
             visit__patient=patient
         ).order_by("-requested_at"),
-        "prescriptions": Prescription.objects.filter(visit__patient=patient).order_by("-issued_at"),
-        "vital_signs": VitalSign.objects.filter(patient=patient).order_by("-created_at")[:20],
+        "prescriptions": Prescription.objects.filter(visit__patient=patient).order_by(
+            "-issued_at"
+        ),
+        "vital_signs": VitalSign.objects.filter(patient=patient).order_by(
+            "-created_at"
+        )[:20],
     }
-    
+
     html_string = render_to_string("billing/print_emr.html", context)
-    
+
     # Try WeasyPrint first (better quality)
     try:
         from weasyprint import HTML
+
         with tempfile.NamedTemporaryFile(delete=True) as tmp:
             HTML(string=html_string).write_pdf(tmp.name)
             tmp.seek(0)
@@ -1880,19 +2151,17 @@ def export_emr_pdf(request, patient_id):
             return HttpResponse("PDF generation failed", status=500)
         buffer.seek(0)
         pdf_data = buffer.getvalue()
-    
-    response = HttpResponse(pdf_data, content_type='application/pdf')
-    response['Content-Disposition'] = f'inline; filename="EMR_{patient.full_name}_{timezone.now().date()}.pdf"'
+
+    response = HttpResponse(pdf_data, content_type="application/pdf")
+    response["Content-Disposition"] = (
+        f'inline; filename="EMR_{patient.full_name}_{timezone.now().date()}.pdf"'
+    )
     return response
 
 
 @login_required
 def activate_visit(request, visit_id):
-    visit = get_object_or_404(
-        PatientVisit,
-        id=visit_id,
-        hospital=request.user.hospital
-    )
+    visit = get_object_or_404(PatientVisit, id=visit_id, hospital=request.user.hospital)
 
     visit.is_active = True
     visit.status = "under_diagnosis"
@@ -1929,13 +2198,19 @@ def check_in_appointment(request, appointment_id):
     if created:
         messages.success(request, f"Visit started for {appointment.patient.full_name}.")
     else:
-        messages.info(request, f"{appointment.patient.full_name} already has an active visit.")
+        messages.info(
+            request, f"{appointment.patient.full_name} already has an active visit."
+        )
 
-    return redirect(f"{reverse('patient_emr', args=[appointment.patient.id])}?visit={visit.id}")
+    return redirect(
+        f"{reverse('patient_emr', args=[appointment.patient.id])}?visit={visit.id}"
+    )
+
 
 # =======================================================
 # 🔬 LAB & RADIOLOGY REPORTS
 # =======================================================
+
 
 @login_required
 def add_lab_report(request, patient_id):
@@ -1943,9 +2218,9 @@ def add_lab_report(request, patient_id):
     if not request.user.is_lab():
         messages.error(request, "Only lab technicians can add lab reports.")
         return redirect("patient_emr", patient_id=patient_id)
-    
+
     patient = get_object_or_404(Patient, id=patient_id, hospital=request.user.hospital)
-    
+
     if request.method == "POST":
         form = LabReportForm(request.POST)
         if form.is_valid():
@@ -1958,12 +2233,18 @@ def add_lab_report(request, patient_id):
             return redirect("patient_emr", patient_id=patient.id)
     else:
         form = LabReportForm()
-    
-    return render(request, "billing/add_lab_report.html", {
-        "form": form,
-        "patient": patient,
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
-    })
+
+    return render(
+        request,
+        "billing/add_lab_report.html",
+        {
+            "form": form,
+            "patient": patient,
+            "unread_count": Message.objects.filter(
+                recipient=request.user, is_read=False
+            ).count(),
+        },
+    )
 
 
 @login_required
@@ -1972,9 +2253,9 @@ def add_radiology_report(request, patient_id):
     if not request.user.is_radiologist():
         messages.error(request, "Only radiologists can add radiology reports.")
         return redirect("patient_emr", patient_id=patient_id)
-    
+
     patient = get_object_or_404(Patient, id=patient_id, hospital=request.user.hospital)
-    
+
     if request.method == "POST":
         form = RadiologyReportForm(request.POST, patient=patient)
         if form.is_valid():
@@ -1988,18 +2269,23 @@ def add_radiology_report(request, patient_id):
         messages.error(request, f"Form errors: {form.errors}")
     else:
         form = RadiologyReportForm(patient=patient)
-    
+
     past_reports = RadiologyReport.objects.filter(
-        patient=patient,
-        hospital=request.user.hospital
+        patient=patient, hospital=request.user.hospital
     ).order_by("-created_at")
-    
-    return render(request, "billing/add_radiology_report.html", {
-        "form": form,
-        "patient": patient,
-        "past_reports": past_reports,
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
-    })
+
+    return render(
+        request,
+        "billing/add_radiology_report.html",
+        {
+            "form": form,
+            "patient": patient,
+            "past_reports": past_reports,
+            "unread_count": Message.objects.filter(
+                recipient=request.user, is_read=False
+            ).count(),
+        },
+    )
 
 
 @login_required
@@ -2019,10 +2305,10 @@ def complete_lab_test(request, test_id):
         return redirect("dashboard")
 
     return render(request, "billing/complete_lab_test.html", {"test": test})
-    
+
+
 from django.shortcuts import get_object_or_404, redirect
 from .models import LabTestRequest, PatientVisit, Patient
-
 
 
 @login_required
@@ -2030,13 +2316,12 @@ def order_lab_test(request, patient_id):
     patient = hospital_scoped_or_404(Patient, request.user, id=patient_id)
 
     # find active visit
-    visit = PatientVisit.objects.filter(
-        patient=patient,
-        is_active=True
-    ).first()
+    visit = PatientVisit.objects.filter(patient=patient, is_active=True).first()
 
     if not visit:
-        messages.error(request, "Patient has no active visit. Please start a visit first.")
+        messages.error(
+            request, "Patient has no active visit. Please start a visit first."
+        )
         return redirect("patient_emr", patient_id=patient.id)
 
     if request.method == "POST":
@@ -2048,17 +2333,18 @@ def order_lab_test(request, patient_id):
             visit=visit,
             doctor=request.user,
             test_type=test_type,
-            status="requested"
+            status="requested",
         )
 
         messages.success(request, "Lab test ordered successfully")
 
     return redirect("patient_emr", patient_id=patient.id)
-    
+
+
 @login_required
 def order_radiology(request, visit_id):
     visit = PatientVisit.objects.get(id=visit_id)
-    
+
     if request.method == "POST":
         imaging_type = request.POST.get("imaging_type")
         notes = request.POST.get("notes")
@@ -2072,7 +2358,7 @@ def order_radiology(request, visit_id):
             visit=visit,
             doctor=request.user,
             imaging_type=imaging_type,
-            notes=notes
+            notes=notes,
         )
 
         # ✅ update visit status
@@ -2123,13 +2409,13 @@ def upload_radiology_result(request, request_id):
         messages.success(request, "Radiology report uploaded successfully.")
         return redirect("dashboard")
 
-    return render(request, "billing/upload_radiology.html", {
-        "radiology": radiology
-    })
+    return render(request, "billing/upload_radiology.html", {"radiology": radiology})
+
 
 # =======================================================
 # 💊 PRESCRIPTIONS
 # =======================================================
+
 
 @login_required
 def create_prescription(request, visit_id):
@@ -2137,9 +2423,9 @@ def create_prescription(request, visit_id):
     if not request.user.is_doctor():
         messages.error(request, "Only doctors can create prescriptions.")
         return redirect("dashboard")
-    
+
     visit = get_object_or_404(PatientVisit, id=visit_id, hospital=request.user.hospital)
-    
+
     if request.method == "POST":
         form = PrescriptionForm(request.POST)
         if form.is_valid():
@@ -2152,12 +2438,18 @@ def create_prescription(request, visit_id):
             return redirect("patient_emr", patient_id=visit.patient.id)
     else:
         form = PrescriptionForm(initial={"visit": visit, "doctor": request.user})
-    
-    return render(request, "billing/prescriptions/create_prescription.html", {
-        "form": form,
-        "visit": visit,
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
-    })
+
+    return render(
+        request,
+        "billing/prescriptions/create_prescription.html",
+        {
+            "form": form,
+            "visit": visit,
+            "unread_count": Message.objects.filter(
+                recipient=request.user, is_read=False
+            ).count(),
+        },
+    )
 
 
 @login_required
@@ -2166,16 +2458,23 @@ def pending_prescriptions(request):
     if not request.user.is_pharmacist():
         messages.error(request, "Only pharmacists can view pending prescriptions.")
         return redirect("dashboard")
-    
-    prescriptions = Prescription.objects.filter(
-        status="issued",
-        hospital=request.user.hospital
-    ).select_related("visit__patient", "doctor").order_by("-issued_at")
-    
-    return render(request, "billing/prescriptions/pending_prescriptions.html", {
-        "prescriptions": prescriptions,
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
-    })
+
+    prescriptions = (
+        Prescription.objects.filter(status="issued", hospital=request.user.hospital)
+        .select_related("visit__patient", "doctor")
+        .order_by("-issued_at")
+    )
+
+    return render(
+        request,
+        "billing/prescriptions/pending_prescriptions.html",
+        {
+            "prescriptions": prescriptions,
+            "unread_count": Message.objects.filter(
+                recipient=request.user, is_read=False
+            ).count(),
+        },
+    )
 
 
 @login_required
@@ -2184,13 +2483,11 @@ def dispense_prescription(request, prescription_id):
     if not request.user.is_pharmacist():
         messages.error(request, "Only pharmacists can dispense prescriptions.")
         return redirect("dashboard")
-    
+
     prescription = get_object_or_404(
-        Prescription, 
-        id=prescription_id, 
-        hospital=request.user.hospital
+        Prescription, id=prescription_id, hospital=request.user.hospital
     )
-    
+
     if prescription.status == "issued":
         prescription.status = "dispensed"
         prescription.dispensed_at = timezone.now()
@@ -2199,7 +2496,7 @@ def dispense_prescription(request, prescription_id):
         messages.success(request, "Prescription marked as dispensed.")
     else:
         messages.warning(request, "This prescription was already dispensed.")
-    
+
     return redirect("pending_prescriptions")
 
 
@@ -2208,19 +2505,23 @@ def print_visit_prescriptions(request, visit_id):
     """Print-friendly prescription list for a visit"""
     visit = get_object_or_404(PatientVisit, id=visit_id, hospital=request.user.hospital)
     prescriptions = Prescription.objects.filter(
-        visit=visit,
-        hospital=request.user.hospital
+        visit=visit, hospital=request.user.hospital
     ).select_related("doctor")
-    
-    return render(request, "billing/print_visit_prescriptions.html", {
-        "visit": visit,
-        "prescriptions": prescriptions,
-    })
+
+    return render(
+        request,
+        "billing/print_visit_prescriptions.html",
+        {
+            "visit": visit,
+            "prescriptions": prescriptions,
+        },
+    )
 
 
 # =======================================================
 # ⚠️ VITAL ALERTS & SLA DASHBOARDS
 # =======================================================
+
 
 @login_required
 def acknowledge_vital_alert(request, alert_id):
@@ -2228,30 +2529,28 @@ def acknowledge_vital_alert(request, alert_id):
     if not request.user.is_doctor():
         messages.error(request, "Only doctors can acknowledge alerts.")
         return redirect("dashboard")
-    
+
     alert = get_object_or_404(
-        VitalAlert,
-        id=alert_id,
-        patient__hospital=request.user.hospital
+        VitalAlert, id=alert_id, patient__hospital=request.user.hospital
     )
-    
+
     if alert.status not in ["open", "escalated"]:
         messages.warning(request, "Alert already acknowledged or resolved.")
         return redirect("patient_emr", patient_id=alert.patient.id)
-    
+
     alert.status = "acknowledged"
     alert.doctor = request.user
     alert.acknowledged_at = timezone.now()
     alert.escalation_deadline = None
     alert.save()
-    
+
     VitalAlertLog.objects.create(
         alert=alert,
         action="acknowledged",
         performed_by=request.user,
-        notes="Doctor acknowledged alert via dashboard"
+        notes="Doctor acknowledged alert via dashboard",
     )
-    
+
     messages.success(request, "Alert acknowledged successfully.")
     return redirect("patient_emr", patient_id=alert.patient.id)
 
@@ -2262,44 +2561,51 @@ def resolve_vital_alert(request, alert_id):
     if not request.user.is_doctor():
         messages.error(request, "Only doctors can resolve alerts.")
         return redirect("dashboard")
-    
+
     alert = get_object_or_404(
-        VitalAlert,
-        id=alert_id,
-        patient__hospital=request.user.hospital
+        VitalAlert, id=alert_id, patient__hospital=request.user.hospital
     )
-    
+
     if alert.status == "resolved":
         messages.warning(request, "Alert already resolved.")
         return redirect("patient_emr", patient_id=alert.patient.id)
-    
+
     if request.method == "POST":
         notes = request.POST.get("notes", "").strip()
         if not notes:
             messages.error(request, "Resolution notes are required.")
-            return render(request, "billing/resolve_alert.html", {
-                "alert": alert,
-                "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
-            })
-        
+            return render(
+                request,
+                "billing/resolve_alert.html",
+                {
+                    "alert": alert,
+                    "unread_count": Message.objects.filter(
+                        recipient=request.user, is_read=False
+                    ).count(),
+                },
+            )
+
         alert.status = "resolved"
         alert.resolved_at = timezone.now()
         alert.save()
-        
+
         VitalAlertLog.objects.create(
-            alert=alert,
-            action="resolved",
-            performed_by=request.user,
-            notes=notes
+            alert=alert, action="resolved", performed_by=request.user, notes=notes
         )
-        
+
         messages.success(request, "Alert resolved with clinical notes.")
         return redirect("patient_emr", patient_id=alert.patient.id)
-    
-    return render(request, "billing/resolve_alert.html", {
-        "alert": alert,
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
-    })
+
+    return render(
+        request,
+        "billing/resolve_alert.html",
+        {
+            "alert": alert,
+            "unread_count": Message.objects.filter(
+                recipient=request.user, is_read=False
+            ).count(),
+        },
+    )
 
 
 @login_required
@@ -2308,21 +2614,31 @@ def doctor_alert_dashboard(request):
     if not request.user.is_doctor():
         messages.error(request, "Unauthorized access")
         return redirect("dashboard")
-    
-    alerts = VitalAlert.objects.filter(
-        status__in=["open", "acknowledged", "escalated"],
-        patient__hospital=request.user.hospital
-    ).select_related("patient", "vital").order_by("-created_at")
-    
+
+    alerts = (
+        VitalAlert.objects.filter(
+            status__in=["open", "acknowledged", "escalated"],
+            patient__hospital=request.user.hospital,
+        )
+        .select_related("patient", "vital")
+        .order_by("-created_at")
+    )
+
     for alert in alerts:
         alert.sla_remaining = sla_remaining_time(alert)
         alert.sla_state = sla_timer_state(alert)
-    
-    return render(request, "billing/doctor_alert_dashboard.html", {
-        "alerts": alerts,
-        "now": timezone.now(),
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
-    })
+
+    return render(
+        request,
+        "billing/doctor_alert_dashboard.html",
+        {
+            "alerts": alerts,
+            "now": timezone.now(),
+            "unread_count": Message.objects.filter(
+                recipient=request.user, is_read=False
+            ).count(),
+        },
+    )
 
 
 @login_required
@@ -2331,20 +2647,26 @@ def admin_alert_dashboard(request):
     if not request.user.is_admin():
         messages.error(request, "Unauthorized access")
         return redirect("dashboard")
-    
-    alerts = VitalAlert.objects.filter(
-        status__in=["open", "escalated"],
-        patient__hospital=request.user.hospital
-    ).select_related(
-        "patient", "vital", "doctor"
-    ).order_by("-created_at")
 
-    
-    return render(request, "billing/alerts/admin_dashboard.html", {
-        "alerts": alerts,
-        "now": timezone.now(),
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
-    })
+    alerts = (
+        VitalAlert.objects.filter(
+            status__in=["open", "escalated"], patient__hospital=request.user.hospital
+        )
+        .select_related("patient", "vital", "doctor")
+        .order_by("-created_at")
+    )
+
+    return render(
+        request,
+        "billing/alerts/admin_dashboard.html",
+        {
+            "alerts": alerts,
+            "now": timezone.now(),
+            "unread_count": Message.objects.filter(
+                recipient=request.user, is_read=False
+            ).count(),
+        },
+    )
 
 
 @login_required
@@ -2353,14 +2675,20 @@ def doctor_sla_dashboard(request):
     if not request.user.is_admin():
         messages.error(request, "Unauthorized access")
         return redirect("dashboard")
-    
+
     hospital = request.user.hospital
     doctors = doctor_sla_metrics(hospital)  # Returns list of doctor metrics dicts
-    
-    return render(request, "billing/admin/doctor_sla_dashboard.html", {
-        "doctors": doctors,
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
-    })
+
+    return render(
+        request,
+        "billing/admin/doctor_sla_dashboard.html",
+        {
+            "doctors": doctors,
+            "unread_count": Message.objects.filter(
+                recipient=request.user, is_read=False
+            ).count(),
+        },
+    )
 
 
 @login_required
@@ -2369,23 +2697,26 @@ def doctor_scorecard(request, doctor_id):
     if not request.user.is_admin():
         messages.error(request, "Unauthorized access")
         return redirect("dashboard")
-    
+
     doctor = get_object_or_404(
-        CustomUser,
-        id=doctor_id,
-        role="doctor",
-        hospital=request.user.hospital
+        CustomUser, id=doctor_id, role="doctor", hospital=request.user.hospital
     )
-    
+
     metrics = doctor_sla_metrics(doctor, request.user.hospital)
     grade = performance_grade(metrics["sla_compliance"], metrics["escalations"])
-    
-    return render(request, "billing/admin/doctor_scorecard.html", {
-        "doctor": doctor,
-        "metrics": metrics,
-        "grade": grade,
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
-    })
+
+    return render(
+        request,
+        "billing/admin/doctor_scorecard.html",
+        {
+            "doctor": doctor,
+            "metrics": metrics,
+            "grade": grade,
+            "unread_count": Message.objects.filter(
+                recipient=request.user, is_read=False
+            ).count(),
+        },
+    )
 
 
 @login_required
@@ -2394,14 +2725,20 @@ def department_sla_dashboard(request):
     if not request.user.is_admin():
         messages.error(request, "Unauthorized access")
         return redirect("dashboard")
-    
+
     hospital = request.user.hospital
     departments = department_sla_metrics(hospital)
-    
-    return render(request, "billing/admin/department_sla_dashboard.html", {
-        "departments": departments,
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
-    })
+
+    return render(
+        request,
+        "billing/admin/department_sla_dashboard.html",
+        {
+            "departments": departments,
+            "unread_count": Message.objects.filter(
+                recipient=request.user, is_read=False
+            ).count(),
+        },
+    )
 
 
 @login_required
@@ -2410,46 +2747,58 @@ def doctor_sla_leaderboard(request):
     if request.user.role not in ["admin", "doctor"]:
         messages.error(request, "Unauthorized access")
         return redirect("dashboard")
-    
+
     doctors = (
         VitalAlert.objects.filter(
-            patient__hospital=request.user.hospital,
-            acknowledged_at__isnull=False
+            patient__hospital=request.user.hospital, acknowledged_at__isnull=False
         )
         .values("doctor__id", "doctor__first_name", "doctor__last_name")
         .annotate(
             total=Count("id"),
-            sla_met=Count("id", filter=Q(acknowledged_at__lte=F('acknowledge_deadline'))),
-            breached=Count("id", filter=Q(acknowledged_at__gt=F('acknowledge_deadline'))),
+            sla_met=Count(
+                "id", filter=Q(acknowledged_at__lte=F("acknowledge_deadline"))
+            ),
+            breached=Count(
+                "id", filter=Q(acknowledged_at__gt=F("acknowledge_deadline"))
+            ),
             avg_response=Avg(
                 ExpressionWrapper(
-                    F("acknowledged_at") - F("created_at"),
-                    output_field=DurationField()
+                    F("acknowledged_at") - F("created_at"), output_field=DurationField()
                 )
-            )
+            ),
         )
     )
-    
+
     leaderboard = []
     for d in doctors:
         total = d["total"]
         sla_rate = round((d["sla_met"] / total) * 100, 1) if total else 0
         name = f"{d['doctor__first_name']} {d['doctor__last_name']}"
-        
-        leaderboard.append({
-            "name": name,
-            "total": total,
-            "sla_rate": sla_rate,
-            "breached": d["breached"],
-            "avg_response": d["avg_response"],
-        })
-    
-    leaderboard.sort(key=lambda x: (-x["sla_rate"], x["avg_response"] or timedelta(hours=999)))
-    
-    return render(request, "billing/doctor_sla_leaderboard.html", {
-        "leaderboard": leaderboard,
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
-    })
+
+        leaderboard.append(
+            {
+                "name": name,
+                "total": total,
+                "sla_rate": sla_rate,
+                "breached": d["breached"],
+                "avg_response": d["avg_response"],
+            }
+        )
+
+    leaderboard.sort(
+        key=lambda x: (-x["sla_rate"], x["avg_response"] or timedelta(hours=999))
+    )
+
+    return render(
+        request,
+        "billing/doctor_sla_leaderboard.html",
+        {
+            "leaderboard": leaderboard,
+            "unread_count": Message.objects.filter(
+                recipient=request.user, is_read=False
+            ).count(),
+        },
+    )
 
 
 @login_required
@@ -2458,31 +2807,30 @@ def doctor_sla_self_view(request):
     if not request.user.is_doctor():
         messages.error(request, "Unauthorized access")
         return redirect("dashboard")
-    
+
     alerts = VitalAlert.objects.filter(
-        doctor=request.user,
-        patient__hospital=request.user.hospital
+        doctor=request.user, patient__hospital=request.user.hospital
     )
-    
+
     total = alerts.count()
     acknowledged = alerts.filter(
-        acknowledged_at__isnull=False,
-        acknowledged_at__lte=F("acknowledge_deadline")
+        acknowledged_at__isnull=False, acknowledged_at__lte=F("acknowledge_deadline")
     ).count()
-    breached = alerts.filter(
-        acknowledged_at__gt=F("acknowledge_deadline")
-    ).count()
+    breached = alerts.filter(acknowledged_at__gt=F("acknowledge_deadline")).count()
     open_alerts = alerts.filter(status="open").count()
-    
-    avg_response = alerts.filter(acknowledged_at__isnull=False).annotate(
-        response_time=ExpressionWrapper(
-            F("acknowledged_at") - F("created_at"),
-            output_field=DurationField()
+
+    avg_response = (
+        alerts.filter(acknowledged_at__isnull=False)
+        .annotate(
+            response_time=ExpressionWrapper(
+                F("acknowledged_at") - F("created_at"), output_field=DurationField()
+            )
         )
-    ).aggregate(avg=Avg("response_time"))["avg"]
-    
+        .aggregate(avg=Avg("response_time"))["avg"]
+    )
+
     sla_rate = round((acknowledged / total) * 100, 1) if total else 0
-    
+
     context = {
         "total": total,
         "acknowledged": acknowledged,
@@ -2490,9 +2838,11 @@ def doctor_sla_self_view(request):
         "open_alerts": open_alerts,
         "sla_rate": sla_rate,
         "avg_response": avg_response,
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
+        "unread_count": Message.objects.filter(
+            recipient=request.user, is_read=False
+        ).count(),
     }
-    
+
     return render(request, "billing/doctor_sla_self.html", context)
 
 
@@ -2502,43 +2852,61 @@ def doctor_sla_trend(request, doctor_id=None):
     if request.user.role != "admin":
         messages.error(request, "Unauthorized access")
         return redirect("dashboard")
-    
+
     alerts = VitalAlert.objects.filter(patient__hospital=request.user.hospital)
     if doctor_id:
         alerts = alerts.filter(doctor_id=doctor_id)
-    
+
     data = (
         alerts.annotate(month=TruncMonth("created_at"))
-        .annotate(doctor_name=Concat(F('doctor__first_name'), Value(' '), F('doctor__last_name')))
+        .annotate(
+            doctor_name=Concat(
+                F("doctor__first_name"), Value(" "), F("doctor__last_name")
+            )
+        )
         .values("doctor_name", "month")
         .annotate(
             total=Count("id"),
-            sla_met=Count("id", filter=Q(acknowledged_at__lte=F('acknowledge_deadline')))
+            sla_met=Count(
+                "id", filter=Q(acknowledged_at__lte=F("acknowledge_deadline"))
+            ),
         )
         .order_by("month")
     )
-    
+
     trends = {}
     for row in data:
         name = row.get("doctor_name") or "Unknown"
-        sla_rate = round((row["sla_met"] / row["total"]) * 100, 1) if row["total"] else 0
-        trends.setdefault(name, []).append({
-            "month": row["month"].strftime("%b %Y"),
-            "sla_rate": sla_rate,
-        })
-    
+        sla_rate = (
+            round((row["sla_met"] / row["total"]) * 100, 1) if row["total"] else 0
+        )
+        trends.setdefault(name, []).append(
+            {
+                "month": row["month"].strftime("%b %Y"),
+                "sla_rate": sla_rate,
+            }
+        )
+
     # Calculate trend direction
     for months in trends.values():
         for i in range(1, len(months)):
-            prev, curr = months[i-1]["sla_rate"], months[i]["sla_rate"]
-            months[i]["trend"] = "up" if curr > prev else "down" if curr < prev else "flat"
+            prev, curr = months[i - 1]["sla_rate"], months[i]["sla_rate"]
+            months[i]["trend"] = (
+                "up" if curr > prev else "down" if curr < prev else "flat"
+            )
         if months:
             months[0]["trend"] = "flat"
-    
-    return render(request, "billing/doctor_sla_trend.html", {
-        "trends": trends,
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
-    })
+
+    return render(
+        request,
+        "billing/doctor_sla_trend.html",
+        {
+            "trends": trends,
+            "unread_count": Message.objects.filter(
+                recipient=request.user, is_read=False
+            ).count(),
+        },
+    )
 
 
 @login_required
@@ -2547,50 +2915,63 @@ def hospital_sla_settings(request):
     if not request.user.is_admin():
         messages.error(request, "Unauthorized access")
         return redirect("dashboard")
-    
+
     hospital = request.user.hospital
     form = HospitalSLAForm(request.POST or None, instance=hospital)
-    
+
     if form.is_valid():
         form.save()
         messages.success(request, "SLA policies updated successfully")
         return redirect("hospital_sla_settings")
-    
-    return render(request, "billing/admin/hospital_sla.html", {
-        "form": form,
-        "unread_count": Message.objects.filter(recipient=request.user, is_read=False).count(),
-    })
+
+    return render(
+        request,
+        "billing/admin/hospital_sla.html",
+        {
+            "form": form,
+            "unread_count": Message.objects.filter(
+                recipient=request.user, is_read=False
+            ).count(),
+        },
+    )
 
 
 # =======================================================
 # 🧰 UTILITIES & TEMPLATES
 # =======================================================
 
+
 @login_required
 def load_note_template(request, key):
     """AJAX endpoint to load pre-defined clinical note templates"""
     template = DOCTOR_NOTE_TEMPLATES.get(key, "")
     return JsonResponse({"template": template})
+
+
 # =======================================================
 # Autocomplete API Endpoint
 # =======================================================
 
 from django.http import JsonResponse
 
+
 @login_required
 def medicine_autocomplete(request):
-    q = request.GET.get('q', '').strip()
+    q = request.GET.get("q", "").strip()
     qs = Medicine.objects.filter(name__icontains=q)
     if hasattr(request.user, "hospital") and request.user.hospital:
         qs = qs.filter(hospital=request.user.hospital)
-    results = [{"id": m.id, "name": m.name, "price": float(m.price), "qty": m.quantity} for m in qs[:10]]
+    results = [
+        {"id": m.id, "name": m.name, "price": float(m.price), "qty": m.quantity}
+        for m in qs[:10]
+    ]
     return JsonResponse(results, safe=False)
-
 
 
 # =======================================================
 # USER REGISTRATION
 # =======================================================
+
 
 def superadmin_login(request):
     """Login only for superadmins on root domain"""
@@ -2629,7 +3010,9 @@ def hospital_login(request, slug=None):
 
             # 🚨 Strict isolation checks
             if user.role == "superadmin":
-                return HttpResponseForbidden("Superadmins cannot log in via hospital domain.")
+                return HttpResponseForbidden(
+                    "Superadmins cannot log in via hospital domain."
+                )
 
             if user.hospital != hospital:
                 return HttpResponseForbidden("You cannot log in to this hospital.")
@@ -2639,7 +3022,9 @@ def hospital_login(request, slug=None):
     else:
         form = AuthenticationForm()
 
-    return render(request, "registration/login.html", {"hospital": hospital, "form": form})
+    return render(
+        request, "registration/login.html", {"hospital": hospital, "form": form}
+    )
 
 
 def register(request):
@@ -2660,12 +3045,16 @@ def register(request):
                 new_user.id,
                 f"Created staff user '{new_user.username}' with role '{new_user.role}'.",
             )
-            messages.success(request, f"User '{new_user.username}' created successfully.")
+            messages.success(
+                request, f"User '{new_user.username}' created successfully."
+            )
             return redirect("register")
     else:
         form = CustomUserCreationForm(request_user=request.user)
 
-    staff_users = CustomUser.objects.filter(hospital=hospital).order_by("role", "username")
+    staff_users = CustomUser.objects.filter(hospital=hospital).order_by(
+        "role", "username"
+    )
     return render(
         request,
         "registration/register.html",
@@ -2680,6 +3069,7 @@ def register(request):
 # =======================================================
 # ROLE-BASED DASHBOARDS (simple render)
 # =======================================================
+
 
 @login_required
 def admin_dashboard(request):
@@ -2700,12 +3090,18 @@ def admin_dashboard(request):
                 new_user.id,
                 f"Created staff user '{new_user.username}' with role '{new_user.role}'.",
             )
-            messages.success(request, f"User '{new_user.username}' created successfully.")
+            messages.success(
+                request, f"User '{new_user.username}' created successfully."
+            )
             return redirect("admin_dashboard")
     else:
         form = CustomUserCreationForm(request_user=request.user)
 
-    return render(request, "billing/dashboard_admin.html", build_admin_dashboard_context(request, form=form))
+    return render(
+        request,
+        "billing/dashboard_admin.html",
+        build_admin_dashboard_context(request, form=form),
+    )
 
 
 @login_required
@@ -2734,7 +3130,9 @@ def toggle_user_active(request, user_id):
         staff_user.id,
         f"{status_label.capitalize()} staff user '{staff_user.username}'.",
     )
-    messages.success(request, f"User '{staff_user.username}' {status_label} successfully.")
+    messages.success(
+        request, f"User '{staff_user.username}' {status_label} successfully."
+    )
     return redirect("admin_dashboard")
 
 
@@ -2747,12 +3145,17 @@ def edit_staff_user(request, user_id):
     staff_user = hospital_scoped_or_404(CustomUser, request.user, id=user_id)
 
     # Extra safety: hospital admins must never manage platform admins, even if someone forces it into the same hospital.
-    if getattr(staff_user, "role", None) == "platform_admin" and request.user.role != "platform_admin":
+    if (
+        getattr(staff_user, "role", None) == "platform_admin"
+        and request.user.role != "platform_admin"
+    ):
         messages.error(request, "Unauthorized access.")
         return redirect("admin_dashboard")
 
     if request.method == "POST":
-        profile_form = StaffUserUpdateForm(request.POST, instance=staff_user, request_user=request.user)
+        profile_form = StaffUserUpdateForm(
+            request.POST, instance=staff_user, request_user=request.user
+        )
         password_form = StaffPasswordResetForm(staff_user)
 
         if profile_form.is_valid():
@@ -2790,10 +3193,14 @@ def edit_staff_user(request, user_id):
                     updated_user.id,
                     description,
                 )
-                messages.success(request, f"User '{updated_user.username}' updated successfully.")
+                messages.success(
+                    request, f"User '{updated_user.username}' updated successfully."
+                )
                 return redirect("edit_staff_user", user_id=staff_user.id)
     else:
-        profile_form = StaffUserUpdateForm(instance=staff_user, request_user=request.user)
+        profile_form = StaffUserUpdateForm(
+            instance=staff_user, request_user=request.user
+        )
         password_form = StaffPasswordResetForm(staff_user)
 
     return render(
@@ -2830,7 +3237,9 @@ def reset_staff_password(request, user_id):
             staff_user.id,
             f"Reset password for staff user '{staff_user.username}'.",
         )
-        messages.success(request, f"Password reset successfully for '{staff_user.username}'.")
+        messages.success(
+            request, f"Password reset successfully for '{staff_user.username}'."
+        )
         return redirect("edit_staff_user", user_id=staff_user.id)
 
     return render(
@@ -2923,14 +3332,17 @@ def delete_service(request, service_id):
     messages.success(request, f"Service '{name}' deleted.")
     return redirect("manage_services")
 
+
 @login_required
 def doctor_dashboard(request):
     patients = Patient.objects.filter(hospital=request.user.hospital)
     return render(request, "billing/dashboard_doctor.html", {"patients": patients})
 
+
 @login_required
 def receptionist_dashboard(request):
     return render(request, "billing/dashboard_receptionist.html")
+
 
 @login_required
 def accountant_dashboard(request):
@@ -2944,13 +3356,16 @@ def accountant_dashboard(request):
         build_accountant_dashboard_context(request.user),
     )
 
+
 @login_required
 def radiologist_dashboard(request):
     return render(request, "billing/dashboard_radiologist.html")
 
+
 @login_required
 def lab_dashboard(request):
     return render(request, "billing/dashboard_lab.html")
+
 
 @login_required
 def pharmacist_dashboard(request):
@@ -2988,17 +3403,22 @@ from django.contrib.auth.decorators import login_required
 from .models import Patient, Prescription, Medicine
 from .forms import PrescriptionForm
 
+
 # Doctor adds a prescription
 @login_required
 def add_prescription(request, patient_id):
     patient = get_object_or_404(Patient, pk=patient_id)
 
     # Get current active visit
-    visit = PatientVisit.objects.filter(
-        patient=patient,
-        hospital=request.user.hospital,
-        is_active=True,
-    ).exclude(status="completed").first()
+    visit = (
+        PatientVisit.objects.filter(
+            patient=patient,
+            hospital=request.user.hospital,
+            is_active=True,
+        )
+        .exclude(status="completed")
+        .first()
+    )
 
     # Automatically create an active visit if none exists
     if not visit:
@@ -3010,7 +3430,7 @@ def add_prescription(request, patient_id):
             status="under_diagnosis",
             is_active=True,
             is_emergency=request.POST.get("is_emergency") == "on",
-            reason=reason
+            reason=reason,
         )
 
     if request.method == "POST":
@@ -3019,12 +3439,14 @@ def add_prescription(request, patient_id):
             medicines = form.cleaned_data["medicines"]
             dosage = form.cleaned_data["dosage"] or "N/A"
             duration = form.cleaned_data["duration"] or "N/A"
-            instructions = form.cleaned_data["instructions"] or "No special instructions"
+            instructions = (
+                form.cleaned_data["instructions"] or "No special instructions"
+            )
 
             prescription = Prescription.objects.create(
                 hospital=request.user.hospital,
                 visit=visit,
-                doctor=request.user,             # this is fine if Prescription model has doctor field
+                doctor=request.user,  # this is fine if Prescription model has doctor field
                 medicines=medicines,
                 dosage=dosage,
                 duration=duration,
@@ -3038,11 +3460,15 @@ def add_prescription(request, patient_id):
     else:
         form = PrescriptionForm()
 
-    return render(request, "billing/prescription_form.html", {"patient": patient, "form": form})
+    return render(
+        request, "billing/prescription_form.html", {"patient": patient, "form": form}
+    )
+
 
 # =======================================================
 # PHARMACIST PRESCRIPTION MANAGEMENT
 # =======================================================
+
 
 @login_required
 def pharmacist_prescriptions(request):
@@ -3052,14 +3478,20 @@ def pharmacist_prescriptions(request):
         return redirect("dashboard")
 
     prescriptions = Prescription.objects.filter(
-        status="issued",
-        hospital=request.user.hospital
+        status="issued", hospital=request.user.hospital
     ).select_related("visit__patient", "doctor")
-    return render(request, "billing/pharmacist_prescriptions.html", {"prescriptions": prescriptions})
+    return render(
+        request,
+        "billing/pharmacist_prescriptions.html",
+        {"prescriptions": prescriptions},
+    )
+
 
 @login_required
 def pharmacist_dispense_prescription(request, prescription_id):
-    prescription = get_object_or_404(Prescription, pk=prescription_id, hospital=request.user.hospital)
+    prescription = get_object_or_404(
+        Prescription, pk=prescription_id, hospital=request.user.hospital
+    )
 
     # Security check
     if not request.user.is_pharmacist() and not request.user.is_admin():
@@ -3094,15 +3526,16 @@ def pharmacist_dispense_prescription(request, prescription_id):
 
             try:
                 med = Medicine.objects.get(
-                    hospital=request.user.hospital,
-                    name__iexact=med_name
+                    hospital=request.user.hospital, name__iexact=med_name
                 )
             except Medicine.DoesNotExist:
                 errors.append(f"{med_name} is not found in inventory.")
                 continue
 
             if med.quantity < qty_needed:
-                errors.append(f"Not enough stock for: {med_name} (needed {qty_needed}, available {med.quantity})")
+                errors.append(
+                    f"Not enough stock for: {med_name} (needed {qty_needed}, available {med.quantity})"
+                )
             else:
                 # deduct from stock
                 med.quantity -= qty_needed
@@ -3113,7 +3546,7 @@ def pharmacist_dispense_prescription(request, prescription_id):
                     user=request.user,
                     change_type="out",
                     quantity=qty_needed,
-                    reason=f"Dispensed for Prescription #{prescription.id}"
+                    reason=f"Dispensed for Prescription #{prescription.id}",
                 )
 
         # If any errors, stop dispensing
@@ -3121,7 +3554,9 @@ def pharmacist_dispense_prescription(request, prescription_id):
             messages.error(request, "Unable to dispense prescription:")
             for e in errors:
                 messages.error(request, e)
-            return redirect("pharmacist_dispense_prescription", prescription_id=prescription.id)
+            return redirect(
+                "pharmacist_dispense_prescription", prescription_id=prescription.id
+            )
 
         # -------------------------------
         # 2️⃣ Update prescription record
@@ -3136,13 +3571,14 @@ def pharmacist_dispense_prescription(request, prescription_id):
         return redirect("dispense_history")
 
     # GET request: show confirmation page
-    return render(request, "billing/pharmacist_dispense_confirm.html", {
-        "prescription": prescription
-    })
+    return render(
+        request,
+        "billing/pharmacist_dispense_confirm.html",
+        {"prescription": prescription},
+    )
 
 
 dispense_prescription = pharmacist_dispense_prescription
-
 
 
 @login_required
@@ -3151,13 +3587,11 @@ def dispense_history(request):
         return HttpResponseForbidden("Not allowed.")
 
     history = Prescription.objects.filter(
-        status="dispensed",
-        pharmacist=request.user
+        status="dispensed", pharmacist=request.user
     ).order_by("-dispensed_at")
 
-    return render(request, "billing/dispense_history.html", {
-        "history": history
-    })
+    return render(request, "billing/dispense_history.html", {"history": history})
+
 
 @login_required
 def medicine_inventory(request):
@@ -3167,9 +3601,8 @@ def medicine_inventory(request):
 
     medicines = Medicine.objects.filter(hospital=request.user.hospital)
 
-    return render(request, "medicine_inventory.html", {
-        "medicines": medicines
-    })
+    return render(request, "medicine_inventory.html", {"medicines": medicines})
+
 
 @login_required
 def doctor_prescriptions(request):
@@ -3177,14 +3610,14 @@ def doctor_prescriptions(request):
         messages.error(request, "Unauthorized access.")
         return redirect("dashboard")
 
-    prescriptions = Prescription.objects.filter(
-        doctor=request.user
-    ).order_by('-issued_at')
+    prescriptions = Prescription.objects.filter(doctor=request.user).order_by(
+        "-issued_at"
+    )
 
-    
-    return render(request, "billing/doctor_prescriptions.html", {
-        "prescriptions": prescriptions
-    })
+    return render(
+        request, "billing/doctor_prescriptions.html", {"prescriptions": prescriptions}
+    )
+
 
 # =======================================================
 # MEDICINE MANAGEMENT VIEWS
@@ -3198,6 +3631,7 @@ from .models import Medicine, StockLog
 import csv
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+
 
 @login_required
 def medicine_list(request):
@@ -3231,12 +3665,16 @@ def medicine_list(request):
     paginator = Paginator(medicines.order_by("name"), 10)
     page_obj = paginator.get_page(request.GET.get("page"))
 
-    return render(request, "billing/medicine/medicine_list.html", {
-        "categories": categories,
-        "page_obj": page_obj,
-        "selected_category": selected_category,
-        "low_stock_threshold": low_stock_threshold,
-    })
+    return render(
+        request,
+        "billing/medicine/medicine_list.html",
+        {
+            "categories": categories,
+            "page_obj": page_obj,
+            "selected_category": selected_category,
+            "low_stock_threshold": low_stock_threshold,
+        },
+    )
 
 
 @login_required
@@ -3252,8 +3690,10 @@ def add_medicine(request):
         price = request.POST.get("price")
         quantity = request.POST.get("quantity")
         category_id = request.POST.get("category")
-        
-        category = MedicineCategory.objects.filter(id=category_id, hospital=hospital).first()
+
+        category = MedicineCategory.objects.filter(
+            id=category_id, hospital=hospital
+        ).first()
 
         # prevent duplicates
         if Medicine.objects.filter(hospital=hospital, name__iexact=name).exists():
@@ -3271,10 +3711,9 @@ def add_medicine(request):
         messages.success(request, "Medicine added successfully.")
         return redirect("medicine_list")
 
-    return render(request, "billing/medicine/add_medicine.html", {
-        "categories": categories
-   })
-
+    return render(
+        request, "billing/medicine/add_medicine.html", {"categories": categories}
+    )
 
 
 @login_required
@@ -3299,10 +3738,11 @@ def edit_medicine(request, pk):
         ).first()
 
         # Prevent duplicate names on same hospital (except itself)
-        if Medicine.objects.filter(
-            hospital=hospital,
-            name__iexact=name
-        ).exclude(id=medicine.id).exists():
+        if (
+            Medicine.objects.filter(hospital=hospital, name__iexact=name)
+            .exclude(id=medicine.id)
+            .exists()
+        ):
             messages.error(request, "A medicine with this name already exists.")
             return redirect("edit_medicine", pk=medicine.id)
 
@@ -3316,10 +3756,14 @@ def edit_medicine(request, pk):
         messages.success(request, "Medicine updated successfully.")
         return redirect("medicine_list")
 
-    return render(request, "billing/medicine/edit_medicine.html", {
-        "medicine": medicine,
-        "categories": categories,
-    })
+    return render(
+        request,
+        "billing/medicine/edit_medicine.html",
+        {
+            "medicine": medicine,
+            "categories": categories,
+        },
+    )
 
 
 @login_required
@@ -3331,9 +3775,11 @@ def delete_medicine(request, pk):
         messages.success(request, "Medicine deleted.")
         return redirect("medicine_list")
 
-    return render(request, "billing/medicine/delete_medicine_confirmation.html", {
-        "medicine": medicine
-    })
+    return render(
+        request,
+        "billing/medicine/delete_medicine_confirmation.html",
+        {"medicine": medicine},
+    )
 
 
 @login_required
@@ -3342,10 +3788,11 @@ def medicine_detail(request, pk):
 
     logs = StockLog.objects.filter(medicine=medicine).order_by("-timestamp")
 
-    return render(request, "billing/medicine/medicine_details.html", {
-        "medicine": medicine,
-        "logs": logs
-    })
+    return render(
+        request,
+        "billing/medicine/medicine_details.html",
+        {"medicine": medicine, "logs": logs},
+    )
 
 
 @login_required
@@ -3358,19 +3805,16 @@ def stock_in(request, pk):
         med.save()
 
         StockLog.objects.create(
-            medicine=med,
-            action="in",
-            quantity=qty,
-            user=request.user
+            medicine=med, action="in", quantity=qty, user=request.user
         )
 
         messages.success(request, f"Added {qty} units to stock.")
         return redirect("medicine_detail", pk=pk)
 
-    return render(request, "billing/medicine/stock_form.html", {
-        "medicine": med,
-        "mode": "in"
-    })
+    return render(
+        request, "billing/medicine/stock_form.html", {"medicine": med, "mode": "in"}
+    )
+
 
 @login_required
 def stock_out(request, pk):
@@ -3387,21 +3831,18 @@ def stock_out(request, pk):
         med.save()
 
         StockLog.objects.create(
-            medicine=med,
-            action="out",
-            quantity=qty,
-            user=request.user
+            medicine=med, action="out", quantity=qty, user=request.user
         )
 
         messages.success(request, f"Removed {qty} units from stock.")
         return redirect("medicine_detail", pk=pk)
 
-    return render(request, "billing/medicine/stock_form.html", {
-        "medicine": med,
-        "mode": "out"
-    })
+    return render(
+        request, "billing/medicine/stock_form.html", {"medicine": med, "mode": "out"}
+    )
 
-#@login_required
+
+# @login_required
 def stock_logs_view(request):
     logs = StockLog.objects.filter(medicine__hospital=request.user.hospital)
 
@@ -3412,8 +3853,7 @@ def stock_logs_view(request):
 
     if q:
         logs = logs.filter(
-            Q(medicine__name__icontains=q) |
-            Q(user__username__icontains=q)
+            Q(medicine__name__icontains=q) | Q(user__username__icontains=q)
         )
 
     if med:
@@ -3428,10 +3868,12 @@ def stock_logs_view(request):
 
     medicines = Medicine.objects.filter(hospital=request.user.hospital)
 
-    return render(request, "billing/medicine/stock_logs.html", {
-        "logs": logs,
-        "medicines": medicines
-    })
+    return render(
+        request,
+        "billing/medicine/stock_logs.html",
+        {"logs": logs, "medicines": medicines},
+    )
+
 
 @login_required
 def inventory_dashboard(request):
@@ -3448,18 +3890,23 @@ def inventory_dashboard(request):
         medicine__hospital=request.user.hospital
     ).order_by("-timestamp")[:10]
 
-    return render(request, "billing/pharmacy/inventory_dashboard.html", {
-        "total_medicines": total_medicines,
-        "low_stock": low_stock,
-        "out_of_stock": out_of_stock,
-        "total_quantity": total_quantity,
-        "recent_logs": recent_logs,
-    })
+    return render(
+        request,
+        "billing/pharmacy/inventory_dashboard.html",
+        {
+            "total_medicines": total_medicines,
+            "low_stock": low_stock,
+            "out_of_stock": out_of_stock,
+            "total_quantity": total_quantity,
+            "recent_logs": recent_logs,
+        },
+    )
 
 
 # =======================================================
 # EXPORT MEDICINES CSV
 # =======================================================
+
 
 @login_required
 def export_medicines_csv(request):
@@ -3512,20 +3959,16 @@ def add_category(request):
 
         # Prevent duplicate categories for the same hospital
         if MedicineCategory.objects.filter(
-            hospital=request.user.hospital,
-            name__iexact=name
+            hospital=request.user.hospital, name__iexact=name
         ).exists():
             messages.error(request, "Category already exists.")
             return redirect("category_list")
 
         # Create category
-        MedicineCategory.objects.create(
-            hospital=request.user.hospital,
-            name=name
-        )
+        MedicineCategory.objects.create(hospital=request.user.hospital, name=name)
 
         messages.success(request, "Category added successfully.")
-        return redirect("category_list")   # FIXED
+        return redirect("category_list")  # FIXED
 
     return render(request, "billing/medicine/category_add.html")  # FIXED PATH
 
@@ -3533,17 +3976,15 @@ def add_category(request):
 @login_required
 def category_list(request):
     categories = MedicineCategory.objects.filter(hospital=request.user.hospital)
-    return render(request, "billing/medicine/category_list.html", {
-        "categories": categories
-    })
+    return render(
+        request, "billing/medicine/category_list.html", {"categories": categories}
+    )
 
 
 @login_required
 def edit_category(request, category_id):
     category = get_object_or_404(
-        MedicineCategory,
-        id=category_id,
-        hospital=request.user.hospital
+        MedicineCategory, id=category_id, hospital=request.user.hospital
     )
 
     # Access control: only admin & pharmacist
@@ -3554,10 +3995,13 @@ def edit_category(request, category_id):
         name = request.POST.get("name").strip()
 
         # Avoid duplicates
-        if MedicineCategory.objects.filter(
-            hospital=request.user.hospital,
-            name__iexact=name
-        ).exclude(id=category.id).exists():
+        if (
+            MedicineCategory.objects.filter(
+                hospital=request.user.hospital, name__iexact=name
+            )
+            .exclude(id=category.id)
+            .exists()
+        ):
             messages.error(request, "A category with this name already exists.")
             return redirect("category_list")
 
@@ -3567,28 +4011,31 @@ def edit_category(request, category_id):
         messages.success(request, "Category updated successfully.")
         return redirect("category_list")
 
-    return render(request, "billing/medicine/edit_category.html", {
-        "category": category
-    })
-
+    return render(
+        request, "billing/medicine/edit_category.html", {"category": category}
+    )
 
 
 @login_required
 def delete_category(request, cat_id):
-    category = get_object_or_404(MedicineCategory, id=cat_id, hospital=request.user.hospital)
+    category = get_object_or_404(
+        MedicineCategory, id=cat_id, hospital=request.user.hospital
+    )
 
     if request.method == "POST":
         category.delete()
         messages.success(request, "Category deleted.")
         return redirect("category_list")
 
-    return render(request, "billing/medicine/delete_category.html", {
-        "category": category
-    })
+    return render(
+        request, "billing/medicine/delete_category.html", {"category": category}
+    )
+
 
 # ==============================
 # VITAL SIGNS
 # ==============================
+
 
 @login_required
 def add_vital_sign(request, patient_id):
@@ -3627,18 +4074,22 @@ def add_vital_sign(request, patient_id):
 
         # Create an alert record if any metric is critical
         if "critical" in alerts_dict.values():
-            critical_items = "; ".join(f"{k}: {v}" for k, v in alerts_dict.items() if v == "critical")
-            
+            critical_items = "; ".join(
+                f"{k}: {v}" for k, v in alerts_dict.items() if v == "critical"
+            )
+
             sla = SLAPolicy.objects.filter(
-                hospital=patient.hospital,
-                severity="critical",
-                active=True
+                hospital=patient.hospital, severity="critical", active=True
             ).first()
 
             now = timezone.now()
             if sla:
-                acknowledge_deadline = now + timedelta(minutes=sla.response_time_minutes)
-                escalation_deadline = now + timedelta(minutes=sla.escalation_time_minutes)
+                acknowledge_deadline = now + timedelta(
+                    minutes=sla.response_time_minutes
+                )
+                escalation_deadline = now + timedelta(
+                    minutes=sla.escalation_time_minutes
+                )
             else:
                 acknowledge_deadline = None
                 escalation_deadline = None
@@ -3647,7 +4098,11 @@ def add_vital_sign(request, patient_id):
                 patient=patient,
                 vital=vital,
                 doctor=visit.assigned_doctor if visit else None,
-                message=("Critical vital signs detected: " + critical_items) if critical_items else "Critical vital signs detected",
+                message=(
+                    ("Critical vital signs detected: " + critical_items)
+                    if critical_items
+                    else "Critical vital signs detected"
+                ),
                 sla_policy=sla,
                 acknowledge_deadline=acknowledge_deadline,
                 escalation_deadline=escalation_deadline,
@@ -3657,7 +4112,7 @@ def add_vital_sign(request, patient_id):
                 alert=alert,
                 action="created",
                 performed_by=request.user,
-                notes="System detected critical vitals"
+                notes="System detected critical vitals",
             )
 
         # Determine overall status
@@ -3666,7 +4121,9 @@ def add_vital_sign(request, patient_id):
         alert_messages = []
 
         for metric, severity in alerts_dict.items():
-            if status_priority.get(severity, 0) > status_priority.get(overall_status, 0):
+            if status_priority.get(severity, 0) > status_priority.get(
+                overall_status, 0
+            ):
                 overall_status = severity
             if severity != "normal":
                 alert_messages.append(f"{metric.replace('_', ' ').title()}: {severity}")
@@ -3687,7 +4144,6 @@ def add_vital_sign(request, patient_id):
     return render(request, "billing/add_vitals.html", {"patient": patient})
 
 
-
 @login_required
 def patient_vitals_graphs(request, patient_id):
     patient = hospital_scoped_or_404(Patient, request.user, id=patient_id)
@@ -3697,21 +4153,27 @@ def patient_vitals_graphs(request, patient_id):
     data = {
         "labels": [v.created_at.strftime("%d %b %H:%M") for v in vitals],
         "pulse": [v.heart_rate for v in vitals],
-        "temperature": [float(v.temperature) if v.temperature else None for v in vitals],
+        "temperature": [
+            float(v.temperature) if v.temperature else None for v in vitals
+        ],
         "systolic": [v.blood_pressure_systolic for v in vitals],
         "diastolic": [v.blood_pressure_diastolic for v in vitals],
     }
 
-    return render(request, "billing/patient_vitals_graphs.html", {
-        "patient": patient,
-        "data": data,
-    })
-
+    return render(
+        request,
+        "billing/patient_vitals_graphs.html",
+        {
+            "patient": patient,
+            "data": data,
+        },
+    )
 
 
 # ------------------------------------------------------------------
 # NHIS CLAIMS DASHBOARD
 # ------------------------------------------------------------------
+
 
 @login_required
 def nhis_claims_dashboard(request):

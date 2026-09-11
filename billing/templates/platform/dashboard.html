@@ -6,144 +6,258 @@
     <!-- HEADER -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
         <div>
-            <h2 class="fw-bold mb-1">Platform Admin Dashboard</h2>
-            <p class="text-muted mb-0">Manage hospitals and subscriptions.</p>
+            <h2 class="fw-bold mb-1">
+                <i class="bi bi-shield-lock text-primary me-2"></i>Platform Admin Dashboard
+            </h2>
+            <p class="text-muted mb-0">Manage hospitals, user accounts, password resets, and subscriptions.</p>
         </div>
-        <div class="d-grid gap-2 d-sm-flex">
-            <a href="{% url 'payment_page' %}" class="btn btn-success">
-                <i class="fas fa-credit-card"></i> Subscribe
+        <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-warning shadow-sm" data-bs-toggle="modal" data-bs-target="#globalResetPasswordModal">
+                <i class="bi bi-key-fill me-1"></i> Reset User Password
+            </button>
+            <a href="{% url 'create_hospital' %}" class="btn btn-primary shadow-sm">
+                <i class="bi bi-plus-circle me-1"></i> Add Hospital
             </a>
-            <a href="{% url 'create_hospital' %}" class="btn btn-primary">
-                + Add Hospital
+            <a href="{% url 'payment_page' %}" class="btn btn-success shadow-sm">
+                <i class="bi bi-credit-card me-1"></i> Subscribe
             </a>
         </div>
     </div>
 
     <!-- STATS CARDS -->
-    <div class="row">
-
-        <div class="col-md-3 mb-3">
-            <div class="card shadow-sm border-0 p-3">
-                <h6>Total Hospitals</h6>
-                <h3>{{ total_hospitals }}</h3>
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 p-3 h-100 bg-white">
+                <div class="text-muted small">Total Hospitals</div>
+                <div class="fs-2 fw-bold text-dark">{{ total_hospitals }}</div>
             </div>
         </div>
 
-        <div class="col-md-3 mb-3">
-            <div class="card shadow-sm border-0 p-3">
-                <h6>Active Hospitals</h6>
-                <h3 class="text-success">{{ active_hospitals }}</h3>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 p-3 h-100 bg-white">
+                <div class="text-muted small">Active Hospitals</div>
+                <div class="fs-2 fw-bold text-success">{{ active_hospitals }}</div>
             </div>
         </div>
 
-        <div class="col-md-3 mb-3">
-            <div class="card shadow-sm border-0 p-3">
-                <h6>Expired Subscriptions</h6>
-                <h3 class="text-danger">{{ expired_hospitals }}</h3>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 p-3 h-100 bg-white">
+                <div class="text-muted small">Expired Subscriptions</div>
+                <div class="fs-2 fw-bold text-danger">{{ expired_hospitals }}</div>
             </div>
         </div>
 
-        <div class="col-md-3 mb-3">
-            <div class="card shadow-sm border-0 p-3">
-                <h6>Revenue (Mock)</h6>
-                <h3>₦{{ revenue }}</h3>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 p-3 h-100 bg-white">
+                <div class="text-muted small">Platform Revenue</div>
+                <div class="fs-2 fw-bold text-primary">₦{{ revenue }}</div>
             </div>
         </div>
-
     </div>
 
     <!-- HOSPITAL TABLE -->
-    <div class="card shadow-sm mt-4">
+    <div class="card shadow-sm border-0">
         <div class="card-body">
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-3">
-                <h5 class="mb-0">Hospitals</h5>
-                <span class="text-muted small">{{ hospitals|length }} total</span>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">Hospitals Directory</h5>
+                <span class="badge bg-secondary">{{ hospitals|length }} Hospitals</span>
             </div>
 
             <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead class="table-light">
-                    <tr>
-                        <th>Logo</th>
-                        <th>Name</th>
-                        <th>Status</th>
-                        <th>Subscription</th>
-                        <th>Expiry</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Logo</th>
+                            <th>Hospital Name</th>
+                            <th>Primary Admin</th>
+                            <th>Status</th>
+                            <th>Subscription</th>
+                            <th>Expiry</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
 
-                <tbody>
-                    {% for hospital in hospitals %}
-                    <tr>
-                        <td>
-                            {% if hospital.logo %}
-                                <img src="{{ hospital.logo.url }}" width="40" height="40" class="rounded object-fit-cover" alt="{{ hospital.name }} logo">
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-
-                        <td>{{ hospital.name }}</td>
-
-                        <td>
-                            {% if hospital.is_active %}
-                                <span class="badge bg-success">Active</span>
-                            {% else %}
-                                <span class="badge bg-danger">Disabled</span>
-                            {% endif %}
-                        </td>
-
-                        <td>
-                            {% if hospital.subscription %}
-                                {% if hospital.subscription.end_date < today %}
-                                    <span class="badge bg-danger">{{ hospital.subscription.plan|capfirst }} - Expired</span>
-                                {% elif hospital.subscription.is_active %}
-                                    <span class="badge bg-success">{{ hospital.subscription.plan|capfirst }} - Active</span>
+                    <tbody>
+                        {% for hospital in hospitals %}
+                        <tr>
+                            <td>
+                                {% if hospital.logo %}
+                                    <img src="{{ hospital.logo.url }}" width="40" height="40" class="rounded object-fit-cover" alt="{{ hospital.name }} logo">
                                 {% else %}
-                                    <span class="badge bg-warning">{{ hospital.subscription.plan|capfirst }} - Pending</span>
+                                    <div class="rounded bg-light text-muted d-flex align-items-center justify-content-center fw-bold" style="width: 40px; height: 40px;">
+                                        {{ hospital.name|first|upper }}
+                                    </div>
                                 {% endif %}
-                            {% else %}
-                                <span class="badge bg-secondary">No subscription</span>
-                            {% endif %}
-                        </td>
+                            </td>
 
-                        <td>
-                            {% if hospital.subscription and hospital.subscription.end_date %}
-                                {{ hospital.subscription.end_date|date:'M d, Y' }}
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
+                            <td class="fw-semibold">{{ hospital.name }}</td>
 
-                        <td>
-                            <div class="d-grid gap-2 d-md-flex">
-                                <a href="{% url 'view_hospital' hospital.id %}" class="btn btn-sm btn-info">View</a>
-                                <a href="{% url 'edit_hospital' hospital.id %}" class="btn btn-sm btn-warning">Edit</a>
+                            <td>
+                                {% if hospital.primary_admin %}
+                                    <div class="small fw-semibold text-dark">{{ hospital.primary_admin.full_name }}</div>
+                                    <small class="text-muted">@{{ hospital.primary_admin.username }}</small>
+                                {% else %}
+                                    <span class="text-muted small">No Admin Registered</span>
+                                {% endif %}
+                            </td>
 
+                            <td>
                                 {% if hospital.is_active %}
-                                    <a href="{% url 'toggle_hospital' hospital.id %}" class="btn btn-sm btn-danger">
-                                        Disable
-                                    </a>
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
                                 {% else %}
-                                    <a href="{% url 'toggle_hospital' hospital.id %}" class="btn btn-sm btn-success">
-                                        Activate
-                                    </a>
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Disabled</span>
                                 {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6">No hospitals yet.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
+                            </td>
 
-            </table>
+                            <td>
+                                {% if hospital.subscription %}
+                                    {% if hospital.subscription.end_date < today %}
+                                        <span class="badge bg-danger">{{ hospital.subscription.plan|capfirst }} - Expired</span>
+                                    {% elif hospital.subscription.is_active %}
+                                        <span class="badge bg-success">{{ hospital.subscription.plan|capfirst }} - Active</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">{{ hospital.subscription.plan|capfirst }} - Pending</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-secondary">No subscription</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if hospital.subscription and hospital.subscription.end_date %}
+                                    {{ hospital.subscription.end_date|date:'M d, Y' }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="{% url 'view_hospital' hospital.id %}" class="btn btn-outline-info" title="View Hospital Details & Users">
+                                        <i class="bi bi-eye"></i> View
+                                    </a>
+                                    <a href="{% url 'edit_hospital' hospital.id %}" class="btn btn-outline-warning" title="Edit Hospital">
+                                        <i class="bi bi-pencil"></i> Edit
+                                    </a>
+
+                                    {% if hospital.primary_admin %}
+                                        <button type="button" class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#resetUserModal{{ hospital.primary_admin.id }}" title="Reset Admin Password">
+                                            <i class="bi bi-key"></i> Reset Password
+                                        </button>
+                                    {% endif %}
+
+                                    {% if hospital.is_active %}
+                                        <a href="{% url 'toggle_hospital' hospital.id %}" class="btn btn-outline-danger">
+                                            Disable
+                                        </a>
+                                    {% else %}
+                                        <a href="{% url 'toggle_hospital' hospital.id %}" class="btn btn-outline-success">
+                                            Activate
+                                        </a>
+                                    {% endif %}
+                                </div>
+
+                                {% if hospital.primary_admin %}
+                                    <!-- Modal for primary admin reset -->
+                                    <div class="modal fade text-start" id="resetUserModal{{ hospital.primary_admin.id }}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content">
+                                                <form method="post" action="{% url 'platform_reset_user_password' hospital.primary_admin.id %}">
+                                                    {% csrf_token %}
+                                                    <div class="modal-header bg-dark text-white">
+                                                        <h5 class="modal-title fw-bold">
+                                                            <i class="bi bi-key me-2 text-warning"></i>Reset Password: {{ hospital.primary_admin.username }}
+                                                        </h5>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <p class="text-muted small">
+                                                            Resetting password for <strong>{{ hospital.primary_admin.full_name }}</strong> ({{ hospital.name }}).
+                                                        </p>
+                                                        <div class="mb-3">
+                                                            <label class="form-label fw-semibold">New Password</label>
+                                                            <input type="password" name="new_password" class="form-control" placeholder="Enter new password" required minlength="6">
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label fw-semibold">Confirm Password</label>
+                                                            <input type="password" name="confirm_password" class="form-control" placeholder="Confirm new password" required minlength="6">
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-primary">Update Password</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-muted">No hospitals registered yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
 </div>
+
+<!-- Global User Password Reset Modal -->
+<div class="modal fade" id="globalResetPasswordModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" id="globalResetForm" action="">
+                {% csrf_token %}
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-key-fill me-2"></i>Platform User Password Reset
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Select User / Account</label>
+                        <select id="userSelect" class="form-select" onchange="updateResetFormAction(this.value)" required>
+                            <option value="">-- Choose User Account --</option>
+                            {% for u in all_users %}
+                                <option value="{{ u.id }}">
+                                    {{ u.username }} ({% if u.full_name %}{{ u.full_name }} • {% endif %}{{ u.get_role_display }}{% if u.hospital %} • {{ u.hospital.name }}{% endif %})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">New Password</label>
+                        <input type="password" name="new_password" class="form-control" placeholder="Enter new password" required minlength="6">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Confirm New Password</label>
+                        <input type="password" name="confirm_password" class="form-control" placeholder="Confirm new password" required minlength="6">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Reset Password Now</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateResetFormAction(userId) {
+    if (userId) {
+        document.getElementById("globalResetForm").action = "/platform/users/" + userId + "/reset-password/";
+    }
+}
+</script>
 {% endblock %}

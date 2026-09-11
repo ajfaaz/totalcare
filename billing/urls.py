@@ -28,6 +28,7 @@ urlpatterns = [
     path('platform/hospitals/add/', views.create_hospital, name='create_hospital'),
     path('platform/hospitals/<int:hospital_id>/', views.view_hospital, name='view_hospital'),
     path('platform/hospitals/<int:hospital_id>/edit/', views.edit_hospital, name='edit_hospital'),
+    path('platform/users/<int:user_id>/reset-password/', views.platform_reset_user_password, name='platform_reset_user_password'),
     path('platform/payment/', views.payment_page, name='payment_page'),
     path('verify-payment/<str:reference>/', views.verify_payment, name='verify_payment'),
     path('payment-failed/', views.payment_failed, name='payment_failed'),
