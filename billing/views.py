@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Q, Max, F, Count, Avg, Value
+from django.db.models import Sum, Q, Max, F, Count, Avg, Value, ExpressionWrapper, DurationField
 from django.db.models.functions import TruncMonth, Concat
 from django.contrib.auth.forms import AuthenticationForm
 from django.http import HttpResponse, HttpResponseForbidden
@@ -243,16 +243,36 @@ def build_admin_dashboard_context(request, form=None):
 
 def build_accountant_dashboard_context(user):
     hospital = user.hospital
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # 1️⃣ Primary Focus: Self-Sponsor (Out-of-Pocket) & Cash Collections
+    all_bills = Bill.objects.filter(hospital=hospital).select_related("patient")
+    self_bills = all_bills.filter(third_party__isnull=True)
+    
+    total_billed = all_bills.aggregate(t=Sum("total_amount"))["t"] or 0
+    self_sponsor_billed = self_bills.aggregate(t=Sum("patient_payable"))["t"] or 0
+    
+    # Payments collected
+    all_payments = Payment.objects.filter(hospital=hospital).select_related("bill", "bill__patient")
+    total_collections = all_payments.aggregate(p=Sum("amount_paid"))["p"] or 0
+    today_collections = all_payments.filter(paid_on__gte=today_start).aggregate(p=Sum("amount_paid"))["p"] or 0
+    
+    # Outstanding balances (Self-Sponsor)
+    unpaid_self_bills = self_bills.filter(is_fully_paid=False).order_by("-created_at")
+    self_sponsor_unpaid = unpaid_self_bills.aggregate(u=Sum("patient_payable"))["u"] or 0
+    self_sponsor_paid = self_bills.filter(is_fully_paid=True).aggregate(p=Sum("patient_payable"))["p"] or 0
+
+    # 2️⃣ Secondary Focus: Government & HMO Claims (NHIS & KSCHMA)
     nhis = Payer.objects.filter(code="NHIS").first()
     kschma = Payer.objects.filter(code="KSCHMA").first()
 
-    government_bills = Bill.objects.filter(
-        hospital=hospital,
+    government_bills = all_bills.filter(
         third_party__payer_type__in=["federal", "state"],
-    ).select_related("patient", "third_party")
+    ).select_related("third_party")
 
-    nhis_bills = government_bills.filter(patient__patientcoverage__payer=nhis).order_by("-created_at")
-    kschma_bills = government_bills.filter(patient__patientcoverage__payer=kschma).order_by("-created_at")
+    nhis_bills = government_bills.filter(patient__patientcoverage__payer=nhis).order_by("-created_at") if nhis else Bill.objects.none()
+    kschma_bills = government_bills.filter(patient__patientcoverage__payer=kschma).order_by("-created_at") if kschma else Bill.objects.none()
 
     def bill_totals(qs):
         return {
@@ -262,13 +282,27 @@ def build_accountant_dashboard_context(user):
         }
 
     return {
+        # Primary Self-Sponsor Metrics
+        "total_billed": total_billed,
+        "self_sponsor_billed": self_sponsor_billed,
+        "self_sponsor_paid": self_sponsor_paid,
+        "self_sponsor_unpaid": self_sponsor_unpaid,
+        "total_collections": total_collections,
+        "today_collections": today_collections,
+        "unpaid_self_bills": unpaid_self_bills[:10],
+        "unpaid_self_count": unpaid_self_bills.count(),
+        "recent_bills": all_bills.order_by("-created_at")[:10],
+        "recent_payments": all_payments.order_by("-paid_on")[:10],
+        
+        # Secondary HMO / Government Metrics
         "nhis": bill_totals(nhis_bills),
         "kschma": bill_totals(kschma_bills),
-        "nhis_bills": nhis_bills[:10],
-        "kschma_bills": kschma_bills[:10],
+        "nhis_bills": nhis_bills[:5],
+        "kschma_bills": kschma_bills[:5],
         "government_bill_count": government_bills.count(),
         "unread_count": Message.objects.filter(recipient=user, is_read=False).count(),
     }
+
 
 @platform_required
 def platform_dashboard(request):
@@ -2108,7 +2142,7 @@ def doctor_alert_dashboard(request):
     alerts = VitalAlert.objects.filter(
         status__in=["open", "acknowledged", "escalated"],
         patient__hospital=request.user.hospital
-    ).select_related("patient", "vital_sign").order_by("-created_at")
+    ).select_related("patient", "vital").order_by("-created_at")
     
     for alert in alerts:
         alert.sla_remaining = sla_remaining_time(alert)
@@ -2132,8 +2166,9 @@ def admin_alert_dashboard(request):
         status__in=["open", "escalated"],
         patient__hospital=request.user.hospital
     ).select_related(
-        "patient", "vital_sign", "doctor"
+        "patient", "vital", "doctor"
     ).order_by("-created_at")
+
     
     return render(request, "billing/alerts/admin_dashboard.html", {
         "alerts": alerts,
@@ -2208,7 +2243,7 @@ def doctor_sla_leaderboard(request):
     
     doctors = (
         VitalAlert.objects.filter(
-            hospital=request.user.hospital,
+            patient__hospital=request.user.hospital,
             acknowledged_at__isnull=False
         )
         .values("doctor__id", "doctor__first_name", "doctor__last_name")
@@ -2256,7 +2291,7 @@ def doctor_sla_self_view(request):
     
     alerts = VitalAlert.objects.filter(
         doctor=request.user,
-        hospital=request.user.hospital
+        patient__hospital=request.user.hospital
     )
     
     total = alerts.count()
@@ -2747,51 +2782,6 @@ def add_prescription(request, patient_id):
 
     return render(request, "billing/prescription_form.html", {"patient": patient, "form": form})
 
-# Pharmacist sees pending prescriptions
-@login_required
-def pending_prescriptions(request):
-    prescriptions = Prescription.objects.filter(status="issued").select_related(
-        "visit__patient", "doctor", "medicine"
-    )
-    prescriptions = Prescription.objects.filter(
-        status="issued"
-    ).select_related("visit__patient", "doctor")
-    return render(request, "billing/prescriptions/pending_prescriptions.html", {"prescriptions": prescriptions})
-
-
-# Pharmacist marks as dispensed (reduces stock)
-from django.utils import timezone
-from django.contrib import messages
-from django.shortcuts import get_object_or_404, redirect
-from .models import Prescription
-
-@login_required
-def dispense_prescription(request, prescription_id):
-    prescription = get_object_or_404(Prescription, id=prescription_id)
-
-    # Only pharmacist can dispense
-    if request.user.role != "pharmacist":
-        return HttpResponse("Unauthorized", status=403)
-
-    prescription.status = "dispensed"
-    prescription.pharmacist = request.user
-    prescription.dispensed_at = timezone.now()
-    prescription.save()
-
-    messages.success(request, "Prescription dispensed successfully.")
-    return redirect("pharmacist_dashboard")
-
-
-@login_required
-def medicine_list(request):
-    if request.user.role != "pharmacist":
-        messages.error(request, "Only pharmacists can view this page.")
-        return redirect("dashboard")
-
-    medicines = Medicine.objects.all()
-    return render(request, "billing/medicine_list.html", {"medicines": medicines})
-
-
 # =======================================================
 # PHARMACIST PRESCRIPTION MANAGEMENT
 # =======================================================
@@ -2799,19 +2789,22 @@ def medicine_list(request):
 @login_required
 def pharmacist_prescriptions(request):
     # Only pharmacists should access this page
-    if request.user.role != "pharmacist":
+    if not request.user.is_pharmacist() and not request.user.is_admin():
         messages.error(request, "Access denied.")
         return redirect("dashboard")
 
-    prescriptions = Prescription.objects.filter(status="issued").select_related("visit__patient", "doctor")
+    prescriptions = Prescription.objects.filter(
+        status="issued",
+        hospital=request.user.hospital
+    ).select_related("visit__patient", "doctor")
     return render(request, "billing/pharmacist_prescriptions.html", {"prescriptions": prescriptions})
 
 @login_required
 def pharmacist_dispense_prescription(request, prescription_id):
-    prescription = get_object_or_404(Prescription, pk=prescription_id)
+    prescription = get_object_or_404(Prescription, pk=prescription_id, hospital=request.user.hospital)
 
     # Security check
-    if request.user.role != "pharmacist":
+    if not request.user.is_pharmacist() and not request.user.is_admin():
         messages.error(request, "Unauthorized access.")
         return redirect("dashboard")
 
@@ -2830,7 +2823,10 @@ def pharmacist_dispense_prescription(request, prescription_id):
                 continue
 
             med_name = line.split("x")[0].strip()
-            qty_needed = int(line.split("x")[1].strip())
+            try:
+                qty_needed = int(line.split("x")[1].strip())
+            except ValueError:
+                continue
 
             try:
                 med = Medicine.objects.get(
@@ -2847,13 +2843,21 @@ def pharmacist_dispense_prescription(request, prescription_id):
                 # deduct from stock
                 med.quantity -= qty_needed
                 med.save()
+                # Create stock log
+                StockLog.objects.create(
+                    medicine=med,
+                    user=request.user,
+                    change_type="out",
+                    quantity=qty_needed,
+                    reason=f"Dispensed for Prescription #{prescription.id}"
+                )
 
         # If any errors, stop dispensing
         if errors:
             messages.error(request, "Unable to dispense prescription:")
             for e in errors:
                 messages.error(request, e)
-            return redirect("pharmacist_dispense_view", prescription_id=prescription.id)
+            return redirect("pharmacist_dispense_prescription", prescription_id=prescription.id)
 
         # -------------------------------
         # 2️⃣ Update prescription record
@@ -2865,50 +2869,15 @@ def pharmacist_dispense_prescription(request, prescription_id):
         prescription.save()
 
         messages.success(request, "Prescription dispensed successfully.")
-        return redirect("pharmacist_history")
+        return redirect("dispense_history")
 
     # GET request: show confirmation page
     return render(request, "billing/pharmacist_dispense_confirm.html", {
         "prescription": prescription
     })
 
+dispense_prescription = pharmacist_dispense_prescription
 
-from django.db import IntegrityError
-from django.contrib import messages
-
-@login_required
-def add_medicine(request):
-    if request.method == "POST":
-        name = request.POST.get("name")
-        price = request.POST.get("price")
-        quantity = request.POST.get("quantity")
-
-        if not name or not price or not quantity:
-            messages.error(request, "All fields are required.")
-            return redirect("add_medicine")
-
-        try:
-            price = float(price)
-            quantity = int(quantity)
-        except ValueError:
-            messages.error(request, "Price and quantity must be valid numbers.")
-            return redirect("add_medicine")
-
-        try:
-            Medicine.objects.create(
-                hospital=request.user.hospital,
-                name=name,
-                price=price,
-                quantity=quantity,
-            )
-            messages.success(request, f"{name} added successfully.")
-            return redirect("medicine_list")
-
-        except IntegrityError:
-            messages.error(request, f"'{name}' already exists in your inventory.")
-            return redirect("add_medicine")
-
-    return render(request, "billing/add_medicine.html")
 
 
 @login_required

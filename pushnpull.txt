@@ -1,0 +1,7 @@
+# 1. Commit and push your local changes to GitHub
+git add .
+git commit -m "polishing the project"
+git push origin main
+
+# 2. Deploy to cPanel live server (via SSH on production server)
+bash /home/jvlbvywb/repositories/totalcare/deploy.sh

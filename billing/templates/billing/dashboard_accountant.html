@@ -1,196 +1,284 @@
 {% extends "base_dashboard.html" %}
 
-{% block title %}Accountant Dashboard{% endblock %}
+{% block title %}Accountant Dashboard - Financial & Cash Collections{% endblock %}
 
 {% block content %}
 
+<!-- Header Section -->
 <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
   <div>
     <h2 class="fw-bold text-primary mb-1">
-      <i class="bi bi-cash-coin me-2"></i>Accountant Dashboard
+      <i class="bi bi-wallet2 me-2"></i>Accountant Dashboard
     </h2>
-    <p class="text-muted mb-0">Track government claims, billing totals, and outstanding reimbursements.</p>
+    <p class="text-muted mb-0">Overview of self-sponsor patient billing, daily cash collections, and outstanding balances.</p>
   </div>
-  <div class="d-flex gap-2">
-    <a href="{% url 'bill_list' %}" class="btn btn-outline-primary">All Bills</a>
-    <a href="{% url 'nhis_claims_dashboard' %}" class="btn btn-primary">Open Claims Detail</a>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{% url 'create_bill_index' %}" class="btn btn-success shadow-sm">
+      <i class="bi bi-plus-circle me-1"></i>New Patient Bill
+    </a>
+    <a href="{% url 'bill_list' %}" class="btn btn-outline-primary shadow-sm">
+      <i class="bi bi-receipt me-1"></i>All Invoices
+    </a>
+    <a href="{% url 'income_report' %}" class="btn btn-outline-secondary shadow-sm">
+      <i class="bi bi-graph-up me-1"></i>Income Report
+    </a>
+    <a href="{% url 'nhis_claims_dashboard' %}" class="btn btn-light border shadow-sm">
+      <i class="bi bi-building me-1"></i>HMO / Claims
+    </a>
   </div>
 </div>
 
+<!-- Primary Metric Cards (Focused on Self-Sponsors & Cash Collections) -->
 <div class="row g-3 mb-4">
+  <!-- Card 1: Total Cash & Collections -->
   <div class="col-md-3">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <h6 class="text-muted mb-2">Government Bills</h6>
-        <div class="fs-3 fw-bold">{{ government_bill_count }}</div>
+    <div class="card border-0 shadow-sm h-100 bg-primary text-white">
+      <div class="card-body d-flex flex-column justify-content-between p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="badge bg-white bg-opacity-25 text-white">Collections</span>
+          <i class="bi bi-cash-stack fs-4 opacity-75"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold mb-1">₦{{ total_collections|floatformat:2 }}</div>
+          <div class="small opacity-75">Today: <strong>₦{{ today_collections|floatformat:2 }}</strong></div>
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- Card 2: Self-Sponsor Outstanding -->
   <div class="col-md-3">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <h6 class="text-muted mb-2">NHIS Total</h6>
-        <div class="fs-3 fw-bold text-primary">₦{{ nhis.total }}</div>
+    <div class="card border-0 shadow-sm h-100 bg-warning text-dark">
+      <div class="card-body d-flex flex-column justify-content-between p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="badge bg-dark bg-opacity-10 text-dark">Self-Sponsor Pending</span>
+          <i class="bi bi-exclamation-triangle fs-4 opacity-75"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold mb-1">₦{{ self_sponsor_unpaid|floatformat:2 }}</div>
+          <div class="small fw-semibold">{{ unpaid_self_count }} unpaid invoice(s)</div>
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- Card 3: Total Billed Amount -->
   <div class="col-md-3">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <h6 class="text-muted mb-2">KSCHMA Total</h6>
-        <div class="fs-3 fw-bold text-success">₦{{ kschma.total }}</div>
+    <div class="card border-0 shadow-sm h-100 bg-success text-white">
+      <div class="card-body d-flex flex-column justify-content-between p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="badge bg-white bg-opacity-25 text-white">Total Revenue</span>
+          <i class="bi bi-receipt-cutoff fs-4 opacity-75"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold mb-1">₦{{ total_billed|floatformat:2 }}</div>
+          <div class="small opacity-75">Self-Sponsor: <strong>₦{{ self_sponsor_billed|floatformat:2 }}</strong></div>
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- Card 4: Messages & HMO Claims Stat -->
   <div class="col-md-3">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <h6 class="text-muted mb-2">Unread Messages</h6>
-        <div class="fs-3 fw-bold text-info">{{ unread_count }}</div>
+    <div class="card border-0 shadow-sm h-100 bg-info text-white">
+      <div class="card-body d-flex flex-column justify-content-between p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="badge bg-white bg-opacity-25 text-white">HMO & Claims</span>
+          <i class="bi bi-shield-check fs-4 opacity-75"></i>
+        </div>
+        <div>
+          <div class="fs-2 fw-bold mb-1">{{ government_bill_count }}</div>
+          <div class="small opacity-75">Claims Registered</div>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
+<!-- Primary Tables Section (Self-Sponsor Invoices & Payment Receipts) -->
 <div class="row g-4 mb-4">
-  <div class="col-lg-6">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <h5 class="fw-bold mb-3">NHIS Summary</h5>
-        <div class="row g-3">
-          <div class="col-4">
-            <div class="border rounded p-3 h-100">
-              <div class="small text-muted">Total</div>
-              <div class="fw-semibold">₦{{ nhis.total }}</div>
-            </div>
+  <!-- Left Column: Pending Self-Sponsor Invoices -->
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-0">
+        <h5 class="fw-bold mb-0 text-dark">
+          <i class="bi bi-clock-history me-2 text-warning"></i>Outstanding Self-Sponsor Invoices
+        </h5>
+        <a href="{% url 'bill_list' %}" class="btn btn-sm btn-outline-primary rounded-pill">View All</a>
+      </div>
+      <div class="card-body p-0">
+        {% if unpaid_self_bills %}
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-3">Invoice #</th>
+                  <th>Patient</th>
+                  <th>Billed</th>
+                  <th>Status</th>
+                  <th class="text-end pe-3">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for bill in unpaid_self_bills %}
+                  <tr>
+                    <td class="ps-3 fw-bold text-primary">#{{ bill.invoice_no|truncatechars:12 }}</td>
+                    <td>
+                      <div class="fw-semibold text-dark">{{ bill.patient.full_name }}</div>
+                      <span class="badge bg-secondary-subtle text-secondary small">{{ bill.get_bill_type_display }}</span>
+                    </td>
+                    <td>₦{{ bill.patient_payable|floatformat:2 }}</td>
+                    <td>
+                      <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Unpaid</span>
+                    </td>
+                    <td class="text-end pe-3">
+                      <a href="{% url 'record_payment' bill.id %}" class="btn btn-sm btn-success rounded-3 me-1">
+                        <i class="bi bi-cash me-1"></i>Pay
+                      </a>
+                      <a href="{% url 'view_invoice' bill.id %}" class="btn btn-sm btn-light border rounded-3">
+                        <i class="bi bi-eye"></i>
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
-          <div class="col-4">
-            <div class="border rounded p-3 h-100">
-              <div class="small text-muted">Paid</div>
-              <div class="fw-semibold text-success">₦{{ nhis.paid }}</div>
-            </div>
+        {% else %}
+          <div class="p-4 text-center text-muted">
+            <i class="bi bi-check-circle fs-1 text-success d-block mb-2"></i>
+            <p class="mb-0">No outstanding self-sponsor invoices! All patient accounts are up to date.</p>
           </div>
-          <div class="col-4">
-            <div class="border rounded p-3 h-100">
-              <div class="small text-muted">Outstanding</div>
-              <div class="fw-semibold text-danger">₦{{ nhis.unpaid }}</div>
-            </div>
-          </div>
-        </div>
+        {% endif %}
       </div>
     </div>
   </div>
-  <div class="col-lg-6">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <h5 class="fw-bold mb-3">KSCHMA Summary</h5>
-        <div class="row g-3">
-          <div class="col-4">
-            <div class="border rounded p-3 h-100">
-              <div class="small text-muted">Total</div>
-              <div class="fw-semibold">₦{{ kschma.total }}</div>
-            </div>
+
+  <!-- Right Column: Recent Payments & Receipts -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-0">
+        <h5 class="fw-bold mb-0 text-dark">
+          <i class="bi bi-journal-check me-2 text-success"></i>Recent Payments Collected
+        </h5>
+        <span class="badge bg-success-subtle text-success">{{ recent_payments|length }} Receipts</span>
+      </div>
+      <div class="card-body p-0">
+        {% if recent_payments %}
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-3">Patient</th>
+                  <th>Mode</th>
+                  <th>Amount</th>
+                  <th class="pe-3">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for pay in recent_payments %}
+                  <tr>
+                    <td class="ps-3">
+                      <div class="fw-semibold text-dark">{{ pay.bill.patient.full_name }}</div>
+                      <small class="text-muted">Invoice #{{ pay.bill.invoice_no|truncatechars:8 }}</small>
+                    </td>
+                    <td>
+                      <span class="badge bg-info-subtle text-info border border-info-subtle text-capitalize">
+                        {{ pay.payment_mode }}
+                      </span>
+                    </td>
+                    <td class="fw-bold text-success">₦{{ pay.amount_paid|floatformat:2 }}</td>
+                    <td class="pe-3 small text-muted">{{ pay.paid_on|date:"M d, H:i" }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
-          <div class="col-4">
-            <div class="border rounded p-3 h-100">
-              <div class="small text-muted">Paid</div>
-              <div class="fw-semibold text-success">₦{{ kschma.paid }}</div>
-            </div>
+        {% else %}
+          <div class="p-4 text-center text-muted">
+            <i class="bi bi-receipt fs-1 text-muted opacity-50 d-block mb-2"></i>
+            <p class="mb-0">No payment receipts recorded today yet.</p>
           </div>
-          <div class="col-4">
-            <div class="border rounded p-3 h-100">
-              <div class="small text-muted">Outstanding</div>
-              <div class="fw-semibold text-danger">₦{{ kschma.unpaid }}</div>
-            </div>
-          </div>
-        </div>
+        {% endif %}
       </div>
     </div>
   </div>
 </div>
 
-<div class="row g-4">
-  <div class="col-lg-6">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="fw-bold mb-0">Recent NHIS Claims</h5>
-          <span class="badge bg-secondary">{{ nhis_bills|length }} shown</span>
-        </div>
-        {% if nhis_bills %}
-          <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th>Invoice</th>
-                  <th>Patient</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for bill in nhis_bills %}
-                  <tr>
-                    <td>{{ bill.invoice_no }}</td>
-                    <td>{{ bill.patient.full_name }}</td>
-                    <td>₦{{ bill.third_party_payable }}</td>
-                    <td>
-                      {% if bill.is_fully_paid %}
-                        <span class="badge bg-success">Paid</span>
-                      {% else %}
-                        <span class="badge bg-warning text-dark">Pending</span>
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        {% else %}
-          <div class="alert alert-light border mb-0">No NHIS claims yet.</div>
-        {% endif %}
+<!-- Secondary HMO / Government Claims Summary (NHIS & KSCHMA) -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center">
+      <i class="bi bi-shield-plus fs-5 text-primary me-2"></i>
+      <div>
+        <h6 class="fw-bold mb-0 text-dark">HMO & Government Health Insurance Summary (NHIS / KSCHMA)</h6>
+        <small class="text-muted">For hospitals managing government or third-party insurance claims</small>
       </div>
     </div>
+    <a href="{% url 'nhis_claims_dashboard' %}" class="btn btn-sm btn-outline-primary">
+      Open Full Claims Manager <i class="bi bi-arrow-right ms-1"></i>
+    </a>
   </div>
-  <div class="col-lg-6">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="fw-bold mb-0">Recent KSCHMA Claims</h5>
-          <span class="badge bg-secondary">{{ kschma_bills|length }} shown</span>
-        </div>
-        {% if kschma_bills %}
-          <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-              <thead class="table-light">
-                <tr>
-                  <th>Invoice</th>
-                  <th>Patient</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for bill in kschma_bills %}
-                  <tr>
-                    <td>{{ bill.invoice_no }}</td>
-                    <td>{{ bill.patient.full_name }}</td>
-                    <td>₦{{ bill.third_party_payable }}</td>
-                    <td>
-                      {% if bill.is_fully_paid %}
-                        <span class="badge bg-success">Paid</span>
-                      {% else %}
-                        <span class="badge bg-warning text-dark">Pending</span>
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+  <div class="card-body">
+    <div class="row g-4">
+      <!-- NHIS Overview -->
+      <div class="col-md-6">
+        <div class="border rounded p-3 bg-white">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold text-primary mb-0"><i class="bi bi-building me-1"></i>NHIS Claims Summary</h6>
+            <span class="badge bg-primary-subtle text-primary">₦{{ nhis.total|floatformat:2 }} Total</span>
           </div>
-        {% else %}
-          <div class="alert alert-light border mb-0">No KSCHMA claims yet.</div>
-        {% endif %}
+          <div class="row g-2 text-center">
+            <div class="col-4">
+              <div class="p-2 bg-light rounded">
+                <small class="text-muted d-block">Billed</small>
+                <strong class="text-dark">₦{{ nhis.total|floatformat:2 }}</strong>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="p-2 bg-light rounded">
+                <small class="text-muted d-block">Paid</small>
+                <strong class="text-success">₦{{ nhis.paid|floatformat:2 }}</strong>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="p-2 bg-light rounded">
+                <small class="text-muted d-block">Pending</small>
+                <strong class="text-danger">₦{{ nhis.unpaid|floatformat:2 }}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KSCHMA Overview -->
+      <div class="col-md-6">
+        <div class="border rounded p-3 bg-white">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold text-success mb-0"><i class="bi bi-bank me-1"></i>KSCHMA Claims Summary</h6>
+            <span class="badge bg-success-subtle text-success">₦{{ kschma.total|floatformat:2 }} Total</span>
+          </div>
+          <div class="row g-2 text-center">
+            <div class="col-4">
+              <div class="p-2 bg-light rounded">
+                <small class="text-muted d-block">Billed</small>
+                <strong class="text-dark">₦{{ kschma.total|floatformat:2 }}</strong>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="p-2 bg-light rounded">
+                <small class="text-muted d-block">Paid</small>
+                <strong class="text-success">₦{{ kschma.paid|floatformat:2 }}</strong>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="p-2 bg-light rounded">
+                <small class="text-muted d-block">Pending</small>
+                <strong class="text-danger">₦{{ kschma.unpaid|floatformat:2 }}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
