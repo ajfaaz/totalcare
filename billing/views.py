@@ -4187,3 +4187,31 @@ def nhis_claims_dashboard(request):
         "billing/accountant/nhis_claims_dashboard.html",
         build_accountant_dashboard_context(request.user),
     )
+
+
+# ------------------------------------------------------------------
+# HELP CENTER & HOSPITAL SUPPORT
+# ------------------------------------------------------------------
+
+
+@login_required
+def help_center(request):
+    """Help Center for hospitals: Direct Email, WhatsApp, and Comprehensive Guides"""
+    support_email = "support@totalcare.arewanetventures.com"
+    support_whatsapp = "2349017862785"
+    whatsapp_formatted = "+234 901 786 2785"
+    
+    hospital_name = request.user.hospital.name if hasattr(request.user, "hospital") and request.user.hospital else "Hospital"
+    user_name = request.user.full_name or request.user.username
+    default_msg = f"Hello TotalCare Support, I am {user_name} from {hospital_name}. I need assistance with..."
+    from django.utils.http import urlencode
+    whatsapp_url = f"https://wa.me/{support_whatsapp}?" + urlencode({"text": default_msg})
+
+    context = {
+        "support_email": support_email,
+        "support_whatsapp": support_whatsapp,
+        "whatsapp_formatted": whatsapp_formatted,
+        "whatsapp_url": whatsapp_url,
+        "hospital_name": hospital_name,
+    }
+    return render(request, "billing/help_center.html", context)

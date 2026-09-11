@@ -8,6 +8,7 @@ urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
     path('redirect-by-role/', views.redirect_by_role, name='redirect_by_role'),
     path('profile/', views.user_profile, name='user_profile'),
+    path('help/', views.help_center, name='help_center'),
 
     
     # Role Dashboards

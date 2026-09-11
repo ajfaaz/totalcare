@@ -1,0 +1,226 @@
+{% extends "billing/base_dashboard.html" %}
+{% block title %}Help Center & Support | TotalCare{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header Banner -->
+    <div class="card border-0 shadow-sm rounded-4 bg-primary text-white p-4 mb-4" style="background: linear-gradient(135deg, #1f3c88 0%, #102a6b 100%);">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <span class="badge bg-white text-primary px-3 py-2 rounded-pill fw-semibold mb-2">
+                    <i class="bi bi-headset me-1"></i> Hospital Support Hub
+                </span>
+                <h2 class="fw-bold text-white mb-2">TotalCare Help Center</h2>
+                <p class="lead mb-0 text-white-50">
+                    Dedicated 24/7 technical and operational support for {{ hospital_name }}. Reach our engineering team instantly.
+                </p>
+            </div>
+            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                <a href="{{ whatsapp_url }}" target="_blank" class="btn btn-success btn-lg px-4 py-2 shadow-sm rounded-pill fw-semibold me-2">
+                    <i class="bi bi-whatsapp me-2"></i> WhatsApp Support
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Direct Contact Cards -->
+    <div class="row g-4 mb-5">
+        <!-- WhatsApp Card -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm h-100 rounded-4 transition-hover" style="border-top: 4px solid #25D366 !important;">
+                <div class="card-body p-4 text-center">
+                    <div class="rounded-circle bg-success bg-opacity-10 text-success d-inline-flex align-items-center justify-content-center mb-3" style="width: 64px; height: 64px;">
+                        <i class="bi bi-whatsapp fs-2"></i>
+                    </div>
+                    <h5 class="fw-bold mb-1">WhatsApp Live Support</h5>
+                    <p class="text-muted small mb-3">Instant response for urgent hospital inquiries & technical aid.</p>
+                    <div class="badge bg-success bg-opacity-10 text-success fw-semibold px-3 py-2 rounded-pill mb-3">
+                        <i class="bi bi-telephone-out me-1"></i> {{ whatsapp_formatted }}
+                    </div>
+                    <div>
+                        <a href="{{ whatsapp_url }}" target="_blank" class="btn btn-success w-100 rounded-pill fw-semibold">
+                            <i class="bi bi-chat-dots me-2"></i> Chat on WhatsApp Now
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Email Support Card -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm h-100 rounded-4 transition-hover" style="border-top: 4px solid #0d6efd !important;">
+                <div class="card-body p-4 text-center">
+                    <div class="rounded-circle bg-primary bg-opacity-10 text-primary d-inline-flex align-items-center justify-content-center mb-3" style="width: 64px; height: 64px;">
+                        <i class="bi bi-envelope-check fs-2"></i>
+                    </div>
+                    <h5 class="fw-bold mb-1">Official Email Helpdesk</h5>
+                    <p class="text-muted small mb-3">Send detailed technical reports, feature requests or billing queries.</p>
+                    <div class="badge bg-primary bg-opacity-10 text-primary fw-semibold px-3 py-2 rounded-pill mb-3 text-truncate max-w-100">
+                        <i class="bi bi-envelope me-1"></i> {{ support_email }}
+                    </div>
+                    <div>
+                        <a href="mailto:{{ support_email }}?subject=Support%20Request%20-%20{{ hospital_name|urlencode }}" class="btn btn-primary w-100 rounded-pill fw-semibold">
+                            <i class="bi bi-send me-2"></i> Send Email Ticket
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enterprise SLA & Support Guarantee -->
+        <div class="col-md-12 col-lg-4">
+            <div class="card border-0 shadow-sm h-100 rounded-4 transition-hover bg-dark text-white" style="border-top: 4px solid #ffc107 !important;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle bg-warning bg-opacity-20 text-warning d-inline-flex align-items-center justify-content-center me-3" style="width: 48px; height: 48px;">
+                            <i class="bi bi-shield-check fs-4"></i>
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-0 text-white">ArewaNet Guarantee</h5>
+                            <span class="small text-warning">Enterprise Hospital SLA</span>
+                        </div>
+                    </div>
+                    <p class="small text-white-50 mb-3">
+                        TotalCare HMS is backed by 99.9% uptime monitoring and real-time cloud backup for all hospital records.
+                    </p>
+                    <ul class="list-unstyled small mb-0 text-white-50">
+                        <li class="mb-2"><i class="bi bi-check-circle-fill text-warning me-2"></i> 24/7 Vital Alert Monitoring</li>
+                        <li class="mb-2"><i class="bi bi-check-circle-fill text-warning me-2"></i> Automated Daily Database Backups</li>
+                        <li><i class="bi bi-check-circle-fill text-warning me-2"></i> Dedicated On-Call System Engineers</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Knowledge Base & Operational Guides -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-header bg-white py-3 border-0 d-flex align-items-center justify-content-between">
+                    <h5 class="fw-bold mb-0 text-dark">
+                        <i class="bi bi-journal-bookmark text-primary me-2"></i> Hospital Operational Guide & FAQ
+                    </h5>
+                    <span class="badge bg-light text-dark border">6 Modules</span>
+                </div>
+                <div class="card-body p-4">
+                    <div class="accordion accordion-flush" id="helpAccordion">
+                        
+                        <!-- Module 1 -->
+                        <div class="accordion-item border rounded-3 mb-3 overflow-hidden">
+                            <h2 class="accordion-header" id="headingOne">
+                                <button class="accordion-button collapsed fw-bold py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
+                                    <i class="bi bi-person-plus text-primary me-2 fs-5"></i> 1. Patient Registration & EMR Record Management
+                                </button>
+                            </h2>
+                            <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body text-secondary lh-lg">
+                                    <p>Receptionists and nurses can register new patients by clicking <strong>Register Patient</strong> from the left sidebar navigation.</p>
+                                    <ul>
+                                        <li><strong>Patient Photos:</strong> Upload a photo thumbnail during registration for quick verification.</li>
+                                        <li><strong>EMR Folder:</strong> Access complete patient visit history, medical notes, lab results, and radiology scans in the unified EMR view.</li>
+                                        <li><strong>Walk-in Visits:</strong> Easily create walk-in appointments for emergency or non-booked triage.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Module 2 -->
+                        <div class="accordion-item border rounded-3 mb-3 overflow-hidden">
+                            <h2 class="accordion-header" id="headingTwo">
+                                <button class="accordion-button collapsed fw-bold py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTwo" aria-expanded="false" aria-controls="collapseTwo">
+                                    <i class="bi bi-cash-stack text-success me-2 fs-5"></i> 2. Cash Billing, Out-of-Pocket Collections & Invoices
+                                </button>
+                            </h2>
+                            <div id="collapseTwo" class="accordion-collapse collapse" aria-labelledby="headingTwo" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body text-secondary lh-lg">
+                                    <p>The <strong>Accountant Dashboard</strong> focuses on cash-paying self-sponsor patients to optimize daily revenue streams.</p>
+                                    <ul>
+                                        <li><strong>Generate Invoices:</strong> Add consultation, lab, radiology, and pharmacy items directly to patient bills.</li>
+                                        <li><strong>Record Receipts:</strong> Capture full or partial cash payments, print official PDF invoices, and view real-time daily revenue reports.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Module 3 -->
+                        <div class="accordion-item border rounded-3 mb-3 overflow-hidden">
+                            <h2 class="accordion-header" id="headingThree">
+                                <button class="accordion-button collapsed fw-bold py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapseThree" aria-expanded="false" aria-controls="collapseThree">
+                                    <i class="bi bi-shield-plus text-info me-2 fs-5"></i> 3. NHIS & KSCHMA Third-Party Claims Management
+                                </button>
+                            </h2>
+                            <div id="collapseThree" class="accordion-collapse collapse" aria-labelledby="headingThree" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body text-secondary lh-lg">
+                                    <p>For hospitals working with government health schemes (NHIS / KSCHMA) or private HMOs:</p>
+                                    <ul>
+                                        <li>Assign coverage percentages to patients (e.g. 90% HMO, 10% Patient Co-pay).</li>
+                                        <li>Submit and track claim authorization codes under the <strong>NHIS / KSCHMA Claims</strong> section.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Module 4 -->
+                        <div class="accordion-item border rounded-3 mb-3 overflow-hidden">
+                            <h2 class="accordion-header" id="headingFour">
+                                <button class="accordion-button collapsed fw-bold py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFour" aria-expanded="false" aria-controls="collapseFour">
+                                    <i class="bi bi-exclamation-triangle text-danger me-2 fs-5"></i> 4. SLA Timers & Emergency Vital Alerts
+                                </button>
+                            </h2>
+                            <div id="collapseFour" class="accordion-collapse collapse" aria-labelledby="headingFour" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body text-secondary lh-lg">
+                                    <p>TotalCare monitors patient vital signs automatically. When abnormal vitals are recorded by a nurse:</p>
+                                    <ul>
+                                        <li>An automated SLA alert is sent to the assigned doctor.</li>
+                                        <li>If unacknowledged within the SLA window, the system escalates the alert to Head Doctor and Hospital Admin.</li>
+                                        <li>Admins can monitor live response timers on the <strong>Vital Alerts Control Center</strong>.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Module 5 -->
+                        <div class="accordion-item border rounded-3 mb-3 overflow-hidden">
+                            <h2 class="accordion-header" id="headingFive">
+                                <button class="accordion-button collapsed fw-bold py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFive" aria-expanded="false" aria-controls="collapseFive">
+                                    <i class="bi bi-prescription2 text-warning me-2 fs-5"></i> 5. Pharmacy Inventory & Medication Dispensing
+                                </button>
+                            </h2>
+                            <div id="collapseFive" class="accordion-collapse collapse" aria-labelledby="headingFive" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body text-secondary lh-lg">
+                                    <p>Pharmacists manage stock levels and dispense doctor prescriptions seamlessly:</p>
+                                    <ul>
+                                        <li>Stock levels automatically deduct upon medication dispensing.</li>
+                                        <li>Low stock warnings alert pharmacists before medications run out.</li>
+                                        <li>Audit logs record all stock adjustments and dispensing transactions.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Module 6 -->
+                        <div class="accordion-item border rounded-3 mb-0 overflow-hidden">
+                            <h2 class="accordion-header" id="headingSix">
+                                <button class="accordion-button collapsed fw-bold py-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSix" aria-expanded="false" aria-controls="collapseSix">
+                                    <i class="bi bi-gear-wide-connected text-dark me-2 fs-5"></i> 6. Staff Roles & Password Resets
+                                </button>
+                            </h2>
+                            <div id="collapseSix" class="accordion-collapse collapse" aria-labelledby="headingSix" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body text-secondary lh-lg">
+                                    <p>Hospital Admins can manage staff accounts from the <strong>Admin Dashboard</strong>:</p>
+                                    <ul>
+                                        <li>Create staff accounts with specific roles (Doctor, Nurse, Pharmacist, Lab, Radiologist, Accountant, Receptionist).</li>
+                                        <li>Reset forgotten staff passwords directly using the built-in password reset tool.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

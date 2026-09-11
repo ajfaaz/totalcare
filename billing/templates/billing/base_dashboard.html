@@ -199,6 +199,44 @@
 })();
 </script>
 
+<!-- Floating WhatsApp Support Button -->
+<a href="https://wa.me/2349017862785?text=Hello%20TotalCare%20Support%2C%20I%20need%20assistance"
+   target="_blank"
+   rel="noopener noreferrer"
+   class="tc-whatsapp-float shadow-lg d-flex align-items-center justify-content-center text-decoration-none"
+   title="Chat with TotalCare Support on WhatsApp">
+    <i class="bi bi-whatsapp"></i>
+    <span class="tc-whatsapp-text ms-2 d-none d-md-inline fw-bold">WhatsApp Support</span>
+</a>
+
+<style>
+.tc-whatsapp-float {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background-color: #25D366;
+    color: #ffffff !important;
+    border-radius: 50px;
+    padding: 12px 20px;
+    font-size: 24px;
+    z-index: 9999;
+    box-shadow: 0 8px 25px rgba(37, 211, 102, 0.45) !important;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.tc-whatsapp-float:hover {
+    background-color: #20ba5a;
+    color: #ffffff !important;
+    transform: translateY(-4px) scale(1.05);
+    box-shadow: 0 12px 30px rgba(37, 211, 102, 0.6) !important;
+}
+
+.tc-whatsapp-float .tc-whatsapp-text {
+    font-size: 14px;
+    letter-spacing: 0.3px;
+}
+</style>
+
 {% block scripts %}{% endblock %}
 </body>
 </html>

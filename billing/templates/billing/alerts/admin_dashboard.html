@@ -1,0 +1,74 @@
+{% extends "billing/base_dashboard.html" %}
+{% block content %}
+
+<div class="container-fluid py-3">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold mb-0 text-dark">
+      <i class="bi bi-shield-exclamation text-danger me-2"></i>Escalation Control Center
+    </h3>
+  </div>
+
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white py-3">
+      <h5 class="mb-0 fw-bold"><i class="bi bi-bell me-2"></i>Active Escalation Alerts</h5>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Patient</th>
+              <th>Doctor</th>
+              <th>Vitals Alert</th>
+              <th>Status</th>
+              <th>SLA Countdown</th>
+              <th>Level</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for alert in alerts %}
+            <tr>
+              <td class="fw-semibold">{{ alert.patient.full_name }}</td>
+              <td>{{ alert.doctor.full_name|default:"Unassigned" }}</td>
+              <td><span class="text-danger fw-semibold">{{ alert.message|truncatechars:40 }}</span></td>
+              <td>
+                {% if alert.status == 'escalated' %}
+                  <span class="badge bg-danger">🔴 Escalated</span>
+                {% elif alert.status == 'open' %}
+                  <span class="badge bg-warning text-dark">🟡 Open</span>
+                {% else %}
+                  <span class="badge bg-success">🟢 {{ alert.status|title }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if alert.next_escalation_deadline %}
+                  <span class="sla-timer badge bg-info"
+                        data-deadline="{{ alert.next_escalation_deadline|date:'c' }}">
+                    ⏳ Loading…
+                  </span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td><span class="badge bg-secondary">Level {{ alert.escalation_level }}</span></td>
+              <td>
+                <a href="{% url 'resolve_alert' alert.id %}" class="btn btn-sm btn-outline-success">
+                  <i class="bi bi-check-circle me-1"></i>Resolve
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="text-center text-muted py-4">No active escalation alerts 🎉</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% include "billing/alerts/sla_timer_script.html" %}
+{% endblock %}

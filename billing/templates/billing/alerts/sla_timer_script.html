@@ -1,0 +1,29 @@
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    function updateSLATimers() {
+        const timers = document.querySelectorAll(".sla-timer");
+        const now = new Date().getTime();
+        
+        timers.forEach(timer => {
+            const deadlineStr = timer.getAttribute("data-deadline");
+            if (!deadlineStr) return;
+            
+            const deadline = new Date(deadlineStr).getTime();
+            const diff = deadline - now;
+            
+            if (diff <= 0) {
+                timer.className = "sla-timer badge bg-danger text-white";
+                timer.innerHTML = "⚠️ SLA Breached";
+            } else {
+                const minutes = Math.floor(diff / (1000 * 60));
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                timer.className = "sla-timer badge bg-warning text-dark";
+                timer.innerHTML = `⏳ ${minutes}m ${seconds}s left`;
+            }
+        });
+    }
+
+    updateSLATimers();
+    setInterval(updateSLATimers, 1000);
+});
+</script>
