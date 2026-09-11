@@ -61,3 +61,36 @@ class EnforceHospitalIsolationMiddleware:
                 pass
 
         return self.get_response(request)
+
+
+class SubscriptionMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # URLs that don't require subscription check
+        exempt_urls = [
+            '/platform/payment/',
+            '/verify-payment/',
+            '/payment-failed/',
+            '/',  # home page
+            '/login/',
+            '/logout/',
+            '/admin/',
+        ]
+        
+        # Check if current path starts with any exempt URL
+        for exempt_url in exempt_urls:
+            if request.path.startswith(exempt_url):
+                return self.get_response(request)
+        
+        if (request.user.is_authenticated and 
+            hasattr(request.user, 'hospital') and 
+            request.user.hospital and
+            request.user.role != 'platform_admin'):  # Platform admins don't need subscription
+            
+            if not request.user.hospital.is_subscription_active:
+                from django.shortcuts import redirect
+                return redirect('payment_page')
+
+        return self.get_response(request)

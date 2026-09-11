@@ -2,11 +2,12 @@
 set -euo pipefail
 
 LIVE_DIR="/home/jvlbvywb/totalcare.arewanetventures.com"
+PYTHON_BIN="/home/jvlbvywb/virtualenv/totalcare.arewanetventures.com/3.10/bin/python"
 
 cd "$LIVE_DIR"
 
 echo "Running Django health checks..."
-python manage.py check
+"$PYTHON_BIN" manage.py check
 
 echo "Checking core app files..."
 test -f "$LIVE_DIR/.htaccess"

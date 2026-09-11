@@ -12,6 +12,7 @@
               <tr>
                 <th>Invoice</th>
                 <th>Patient</th>
+                <th>Type</th>
                 <th>Date</th>
                 <th>Total</th>
                 <th>Status</th>
@@ -23,13 +24,14 @@
               <tr>
                 <td>{{ bill.invoice_no }}</td>
                 <td>{{ bill.patient.full_name }}</td>
+                <td>{{ bill.get_bill_type_display }}</td>
                 <td>{{ bill.created_at|date:"Y-m-d" }}</td>
                 <td>₦{{ bill.total_amount }}</td>
                 <td>
                   {% if bill.is_fully_paid %}
-                    <span class="badge badge-success">Paid</span>
+                    <span class="badge bg-success">Paid</span>
                   {% else %}
-                    <span class="badge badge-warning">Pending</span>
+                    <span class="badge bg-warning text-dark">Pending</span>
                   {% endif %}
                 </td>
                 <td>

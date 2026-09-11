@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPO_DIR="/home/jvlbvywb/repositories/totalcare"
 LIVE_DIR="/home/jvlbvywb/totalcare.arewanetventures.com"
+PYTHON_BIN="/home/jvlbvywb/virtualenv/totalcare.arewanetventures.com/3.10/bin/python"
 
 echo "Pulling latest code from GitHub..."
 cd "$REPO_DIR"
@@ -22,8 +23,8 @@ tar \
 
 echo "Running Django deployment steps..."
 cd "$LIVE_DIR"
-python manage.py migrate
-python manage.py collectstatic --noinput
+"$PYTHON_BIN" manage.py migrate
+"$PYTHON_BIN" manage.py collectstatic --noinput
 touch tmp/restart.txt
 
 echo "Deployment complete."

@@ -21,9 +21,13 @@ from .models import (
 class PatientForm(forms.ModelForm):
     class Meta:
         model = Patient
-        fields = ['full_name', 'date_of_birth', 'phone_number', 'address']
+        fields = ['full_name', 'date_of_birth', 'phone_number', 'address', 'photo']
         widgets = {
-            'date_of_birth': forms.DateInput(attrs={'type': 'date'}),
+            'full_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Full name'}),
+            'date_of_birth': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'phone_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Phone number'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Address'}),
+            'photo': forms.ClearableFileInput(attrs={'class': 'form-control'}),
         }
 
 
@@ -41,7 +45,15 @@ class PatientRegistrationForm(forms.ModelForm):
             "date_of_birth",
             "phone_number",
             "address",
+            "photo",
         ]
+        widgets = {
+            'full_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Full name'}),
+            'date_of_birth': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'phone_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Phone number'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Address'}),
+            'photo': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+        }
 
     def save(self, commit=True):
         patient = super().save(commit=commit)
@@ -81,6 +93,10 @@ class CustomUserCreationForm(UserCreationForm):
         required=True,
         widget=forms.Select(attrs={'class': 'form-control'})
     )
+    profile_picture = forms.ImageField(
+        required=False,
+        widget=forms.ClearableFileInput(attrs={'class': 'form-control'})
+    )
 
     class Meta:
         model = User
@@ -91,6 +107,7 @@ class CustomUserCreationForm(UserCreationForm):
             "email",
             "role",
             "specialty",
+            "profile_picture",
             "password1",
             "password2",
         )
@@ -114,6 +131,8 @@ class CustomUserCreationForm(UserCreationForm):
         user.last_name = self.cleaned_data["last_name"]
         user.email = self.cleaned_data["email"]
         user.role = self.cleaned_data["role"]
+        if self.cleaned_data.get("profile_picture"):
+            user.profile_picture = self.cleaned_data["profile_picture"]
         if not hospital:
             raise ValueError("A hospital must be provided when creating a user.")
         user.hospital = hospital
@@ -125,7 +144,7 @@ class CustomUserCreationForm(UserCreationForm):
 class StaffUserUpdateForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ("first_name", "last_name", "username", "email", "role", "specialty", "is_active")
+        fields = ("first_name", "last_name", "username", "email", "role", "specialty", "profile_picture", "is_active")
         widgets = {
             "first_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "First name"}),
             "last_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Last name"}),
@@ -133,6 +152,7 @@ class StaffUserUpdateForm(forms.ModelForm):
             "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "Email address"}),
             "role": forms.Select(attrs={"class": "form-control"}),
             "specialty": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. Cardiology"}),
+            "profile_picture": forms.ClearableFileInput(attrs={"class": "form-control"}),
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
@@ -140,6 +160,20 @@ class StaffUserUpdateForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["role"].help_text = "Update the staff member's access level."
         self.fields["specialty"].help_text = "Optional. Useful for doctors and specialist roles."
+
+
+class UserProfileForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ("first_name", "last_name", "email", "specialty", "profile_picture")
+        widgets = {
+            "first_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "First name"}),
+            "last_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Last name"}),
+            "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "Email address"}),
+            "specialty": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. Cardiology"}),
+            "profile_picture": forms.ClearableFileInput(attrs={"class": "form-control"}),
+        }
+
 
 
 class StaffPasswordResetForm(SetPasswordForm):
@@ -227,6 +261,12 @@ from django import forms
 from .models import Prescription
 
 class PrescriptionForm(forms.ModelForm):
+    reason = forms.CharField(
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Reason for visit (optional)"}),
+        help_text="Specify the reason for this visit if creating a new visit"
+    )
     class Meta:
         model = Prescription
         fields = ["medicines", "dosage", "duration", "instructions"]
@@ -261,6 +301,24 @@ class HospitalSLAForm(forms.ModelForm):
             "sla_head_doctor_minutes",
             "sla_admin_minutes",
         ]
+
+class HospitalCreateForm(forms.ModelForm):
+    class Meta:
+        model = Hospital
+        fields = [
+            "name",
+            "owner_email",
+            "phone_number",
+            "logo",
+        ]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Hospital name"}),
+            "owner_email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "Owner email"}),
+            "phone_number": forms.TextInput(attrs={"class": "form-control", "placeholder": "Hospital phone number"}),
+            "logo": forms.ClearableFileInput(attrs={"class": "form-control"}),
+        }
+
+
 
 class SLAPolicyForm(forms.ModelForm):
     class Meta:

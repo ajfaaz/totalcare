@@ -1,11 +1,10 @@
 {% extends 'base_dashboard.html' %}
-{% block title %}Create Bill{% endblock %}
+{% block title %}Create Pharmacy Bill{% endblock %}
 {% block content %}
 
 <div class="container mt-4">
-    <h3>Create Bill for {{ patient.full_name }}</h3>
+    <h3>Create Pharmacy Bill for {{ patient.full_name }}</h3>
 
-    <!-- Coverage Info -->
     {% if coverage %}
     <div class="alert alert-info">
         <strong>Coverage:</strong> {{ coverage.payer.name }} <br>
@@ -20,21 +19,21 @@
         <table class="table table-bordered">
             <thead>
                 <tr>
-                    <th>Service</th>
+                    <th>Medicine</th>
                     <th>Price</th>
                     <th>Quantity</th>
                 </tr>
             </thead>
             <tbody>
-                {% for service in services %}
+                {% for medicine in medicines %}
                 <tr>
                     <td>
-                        <input type="checkbox" name="service" value="{{ service.id }}">
-                        {{ service.name }}
+                        <input type="checkbox" name="medicine" value="{{ medicine.id }}">
+                        {{ medicine.name }}
                     </td>
-                    <td>₦{{ service.price }}</td>
+                    <td>₦{{ medicine.price }}</td>
                     <td>
-                        <input type="number" name="quantity_{{ service.id }}" min="1" value="1" class="form-control">
+                        <input type="number" name="quantity_{{ medicine.id }}" min="1" value="1" class="form-control">
                     </td>
                 </tr>
                 {% endfor %}
@@ -42,7 +41,7 @@
         </table>
 
         <button type="submit" class="btn btn-primary">
-            Generate Invoice
+            Generate Pharmacy Invoice
         </button>
     </form>
 </div>

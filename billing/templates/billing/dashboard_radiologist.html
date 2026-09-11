@@ -75,6 +75,9 @@
                 <td>{{ scan.doctor.full_name|default:"Unassigned" }}</td>
                 <td>{{ scan.requested_at|date:"M d, H:i" }}</td>
                 <td class="text-end">
+                  <a href="{% url 'upload_radiology_result' scan.id %}" class="btn btn-sm btn-success me-2">
+                    Upload Result
+                  </a>
                   <a href="{% url 'patient_emr' scan.visit.patient.id %}" class="btn btn-sm btn-outline-primary">
                     View EMR
                   </a>

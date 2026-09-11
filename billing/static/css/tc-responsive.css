@@ -1,0 +1,71 @@
+/* Global mobile-first fixes to make the whole app usable on phones. */
+
+:root {
+  --tc-sidebar-width: 250px;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+/* If any long strings (IDs, codes) appear, avoid breaking layout */
+.text-break-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Sidebar + content layout: desktop uses fixed sidebar, mobile uses offcanvas */
+.content {
+  margin-left: var(--tc-sidebar-width);
+  min-width: 0;
+}
+
+.tc-flash {
+  margin-left: calc(var(--tc-sidebar-width) + 10px);
+}
+
+@media (max-width: 767.98px) {
+  .content {
+    margin-left: 0;
+    padding: 16px !important;
+  }
+
+  .tc-flash {
+    margin-left: 0 !important;
+  }
+
+  /* Let the navbar user/meta area collapse gracefully */
+  .tc-user-meta {
+    display: none !important;
+  }
+}
+
+/* Make bootstrap tables usable on small screens without editing every template */
+@media (max-width: 767.98px) {
+  table.table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Reduce excessive whitespace on small screens */
+@media (max-width: 575.98px) {
+  .card-body {
+    padding: 0.9rem;
+  }
+}
+

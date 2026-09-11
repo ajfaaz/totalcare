@@ -6,271 +6,252 @@
 {% block content %}
 
 <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
-<div>
-<h2 class="fw-bold text-primary mb-1">
-<i class="bi bi-person-heart me-2"></i>Doctor Dashboard
-</h2>
-<p class="text-muted mb-0">Review your patient load, appointments, and active care queue.</p>
-</div>
-<div class="d-flex gap-2">
-<a href="{% url 'patient_list' %}" class="btn btn-outline-primary">Patient List</a>
-<a href="{% url 'doctor_prescriptions' %}" class="btn btn-outline-secondary">My Prescriptions</a>
-</div>
+    <div>
+        <h2 class="fw-bold text-primary mb-1">
+            <i class="bi bi-person-heart me-2"></i>Doctor Dashboard
+        </h2>
+        <p class="text-muted mb-0">Review your patient load, appointments, and active care queue.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'patient_list' %}" class="btn btn-outline-primary"><i class="bi bi-people me-1"></i> Patient List</a>
+        <a href="{% url 'doctor_prescriptions' %}" class="btn btn-outline-secondary"><i class="bi bi-journal-medical me-1"></i> My Prescriptions</a>
+        <a href="{% url 'doctor_sla_self' %}" class="btn btn-outline-info"><i class="bi bi-award me-1"></i> My SLA Scorecard</a>
+    </div>
 </div>
 
 <!-- KPI CARDS -->
 <div class="row g-3 mb-4">
 
-<div class="col-md-3">
-<div class="card shadow-sm h-100">
-<div class="card-body">
-<h6 class="text-muted">
-<i class="bi bi-people me-1"></i> My Patients
-</h6>
-<h3 class="fw-bold">{{ doctor_patient_count }}</h3>
-</div>
-</div>
-</div>
+    <div class="col-md-3">
+        <div class="card shadow-sm h-100 border-0">
+            <div class="card-body">
+                <h6 class="text-muted">
+                    <i class="bi bi-people me-1"></i> My Patients
+                </h6>
+                <h3 class="fw-bold">{{ doctor_patient_count }}</h3>
+            </div>
+        </div>
+    </div>
 
-<div class="col-md-3">
-<div class="card shadow-sm h-100">
-<div class="card-body">
-<h6 class="text-muted">
-<i class="bi bi-calendar2-week me-1"></i> Visits (30 days)
-</h6>
-<h3 class="fw-bold text-primary">{{ visits_last_30 }}</h3>
-</div>
-</div>
-</div>
+    <div class="col-md-3">
+        <div class="card shadow-sm h-100 border-0">
+            <div class="card-body">
+                <h6 class="text-muted">
+                    <i class="bi bi-calendar2-week me-1"></i> Visits (30 days)
+                </h6>
+                <h3 class="fw-bold text-primary">{{ visits_last_30 }}</h3>
+            </div>
+        </div>
+    </div>
 
-<div class="col-md-3">
-<div class="card shadow-sm h-100">
-<div class="card-body">
-<h6 class="text-muted">
-<i class="bi bi-journal-medical me-1"></i> Prescriptions
-</h6>
-<h3 class="fw-bold text-success">{{ prescriptions_issued }}</h3>
-</div>
-</div>
-</div>
+    <div class="col-md-3">
+        <div class="card shadow-sm h-100 border-0">
+            <div class="card-body">
+                <h6 class="text-muted">
+                    <i class="bi bi-journal-medical me-1"></i> Prescriptions
+                </h6>
+                <h3 class="fw-bold text-success">{{ prescriptions_issued }}</h3>
+            </div>
+        </div>
+    </div>
 
-<div class="col-md-3">
-<div class="card shadow-sm h-100">
-<div class="card-body">
-<h6 class="text-muted">
-<i class="bi bi-capsule me-1"></i> Dispensed
-</h6>
-<h3 class="fw-bold text-warning">{{ prescriptions_dispensed }}</h3>
-</div>
-</div>
-</div>
-
-<div class="col-md-3">
-<div class="card shadow-sm h-100">
-<div class="card-body">
-<h6 class="text-muted">
-<i class="bi bi-check2-circle me-1"></i> Completion Rate
-</h6>
-<h3 class="fw-bold text-info">{{ completion_rate }}%</h3>
-</div>
-</div>
-</div>
+    <div class="col-md-3">
+        <div class="card shadow-sm h-100 border-0">
+            <div class="card-body">
+                <h6 class="text-muted">
+                    <i class="bi bi-check2-circle me-1"></i> Completion Rate
+                </h6>
+                <h3 class="fw-bold text-info">{{ completion_rate }}%</h3>
+            </div>
+        </div>
+    </div>
 
 </div>
 
-
+<!-- QUICK LINKS -->
 <div class="row g-3 mb-4">
 
-<div class="col-md-4">
-<div class="card shadow-sm text-center">
-<div class="card-body">
-<i class="bi bi-people fs-3 text-primary"></i>
-<h6 class="mt-2">View Patients</h6>
-<a href="{% url 'patient_list' %}" class="btn btn-sm btn-outline-primary mt-2">
-Open
-</a>
-</div>
-</div>
-</div>
+    <div class="col-md-4">
+        <div class="card shadow-sm text-center border-0">
+            <div class="card-body">
+                <i class="bi bi-people fs-3 text-primary"></i>
+                <h6 class="mt-2">Patient Directory</h6>
+                <a href="{% url 'patient_list' %}" class="btn btn-sm btn-outline-primary mt-2">
+                    Open Directory
+                </a>
+            </div>
+        </div>
+    </div>
 
-<div class="col-md-4">
-<div class="card shadow-sm text-center">
-<div class="card-body">
-<i class="bi bi-envelope fs-3 text-success"></i>
-<h6 class="mt-2">Messages</h6>
-<a href="{% url 'inbox' %}" class="btn btn-sm btn-outline-success mt-2">
-Inbox
-</a>
-</div>
-</div>
-</div>
+    <div class="col-md-4">
+        <div class="card shadow-sm text-center border-0">
+            <div class="card-body">
+                <i class="bi bi-envelope fs-3 text-success"></i>
+                <h6 class="mt-2">Messages</h6>
+                <a href="{% url 'inbox' %}" class="btn btn-sm btn-outline-success mt-2">
+                    Inbox
+                </a>
+            </div>
+        </div>
+    </div>
 
-<div class="col-md-4">
-<div class="card shadow-sm text-center">
-<div class="card-body">
-<i class="bi bi-exclamation-triangle fs-3 text-danger"></i>
-<h6 class="mt-2">Vital Alerts</h6>
-<a href="{% url 'doctor_alert_dashboard' %}" class="btn btn-sm btn-outline-danger mt-2">
-View Alerts
-</a>
-</div>
-</div>
-</div>
-
-</div>
-
-
-<div class="card shadow-sm border-0">
-
-<div class="card-body">
-
-<div class="d-flex justify-content-between align-items-center mb-3">
-<h5 class="fw-bold mb-0">Assigned Patients</h5>
-<span class="badge bg-secondary">{{ patients|length }} shown</span>
-</div>
-
-{% if patients %}
-<div class="table-responsive">
-
-<table class="table align-middle table-hover">
-
-<thead class="table-light">
-<tr>
-<th>Patient</th>
-<th>Phone</th>
-<th class="text-end">Actions</th>
-</tr>
-</thead>
-
-<tbody>
-
-{% for p in patients %}
-<tr>
-
-<td>
-<div class="fw-semibold">{{ p.full_name }}</div>
-</td>
-
-<td>{{ p.phone_number }}</td>
-
-<td class="text-end">
-
-<a href="{% url 'patient_emr' p.id %}" 
-class="btn btn-sm btn-outline-primary me-2">
-<i class="bi bi-file-medical"></i>
-</a>
-
-<a href="{% url 'add_prescription' p.id %}" 
-class="btn btn-sm btn-outline-success">
-<i class="bi bi-prescription"></i>
-</a>
-
-</td>
-
-</tr>
-{% endfor %}
-
-</tbody>
-</table>
+    <div class="col-md-4">
+        <div class="card shadow-sm text-center border-0">
+            <div class="card-body">
+                <i class="bi bi-exclamation-triangle fs-3 text-danger"></i>
+                <h6 class="mt-2">Vital Alerts</h6>
+                <a href="{% url 'doctor_alert_dashboard' %}" class="btn btn-sm btn-outline-danger mt-2">
+                    View Alerts
+                </a>
+            </div>
+        </div>
+    </div>
 
 </div>
 
-{% else %}
+<!-- ASSIGNED PATIENTS TABLE -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0">Assigned Patients</h5>
+            <span class="badge bg-secondary">{{ patients|length }} shown</span>
+        </div>
 
-<div class="alert alert-light border text-center">
-<i class="bi bi-info-circle me-1"></i>
-No patients assigned yet.
+        {% if patients %}
+            <div class="table-responsive">
+                <table class="table align-middle table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Patient</th>
+                            <th>Phone</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in patients %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center gap-3">
+                                        {% if p.photo %}
+                                            <img src="{{ p.photo.url }}" alt="{{ p.full_name }}" class="rounded-circle object-fit-cover border shadow-sm" width="38" height="38">
+                                        {% else %}
+                                            <div class="rounded-circle bg-primary text-white fw-bold d-flex align-items-center justify-content-center border shadow-sm" style="width: 38px; height: 38px; font-size: 14px;">
+                                                {{ p.full_name|first|upper }}
+                                            </div>
+                                        {% endif %}
+                                        <div>
+                                            <div class="fw-semibold">{{ p.full_name }}</div>
+                                            <div class="text-muted small">ID: #{{ p.id }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ p.phone_number|default:"-" }}</td>
+                                <td class="text-end">
+                                    <a href="{% url 'patient_emr' p.id %}" class="btn btn-sm btn-outline-primary me-1" title="Open EMR">
+                                        <i class="bi bi-file-medical me-1"></i> EMR
+                                    </a>
+                                    <a href="{% url 'add_prescription' p.id %}" class="btn btn-sm btn-outline-success" title="Add Prescription">
+                                        <i class="bi bi-prescription me-1"></i> Rx
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-light border text-center mb-0">
+                <i class="bi bi-info-circle me-1"></i> No patients assigned yet.
+            </div>
+        {% endif %}
+    </div>
 </div>
 
-{% endif %}
-
-</div>
-</div>
-
+<!-- QUEUE & APPOINTMENTS -->
 <div class="row g-4">
-<div class="col-lg-7">
-<div class="card shadow-sm border-0">
-<div class="card-body">
-<div class="d-flex justify-content-between align-items-center mb-3">
-<h5 class="fw-bold mb-0">Patient Queue</h5>
-<span class="badge bg-secondary">{{ queue|length }} waiting</span>
-</div>
+    <div class="col-lg-7">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0">Patient Queue</h5>
+                    <span class="badge bg-secondary">{{ queue|length }} waiting</span>
+                </div>
 
-{% if queue %}
-<div class="table-responsive">
-<table class="table table-hover align-middle mb-0">
-<thead class="table-light">
-<tr>
-<th>#</th>
-<th>Patient</th>
-<th>Status</th>
-<th>Priority</th>
-<th class="text-end">Action</th>
-</tr>
-</thead>
-<tbody>
-{% for visit in queue %}
-<tr>
-<td>{{ forloop.counter }}</td>
-<td>{{ visit.patient.full_name }}</td>
-<td>{{ visit.get_status_display }}</td>
-<td>
-{% if visit.is_emergency %}
-<span class="badge bg-danger">Emergency</span>
-{% else %}
-<span class="badge bg-secondary">Normal</span>
-{% endif %}
-</td>
-<td class="text-end">
-<a href="{% url 'patient_emr' visit.patient.id %}" class="btn btn-sm btn-primary">Open</a>
-</td>
-</tr>
-{% endfor %}
-</tbody>
-</table>
-</div>
-{% else %}
-<div class="alert alert-light border mb-0">No patients are waiting in your queue.</div>
-{% endif %}
-</div>
-</div>
-</div>
+                {% if queue %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Patient</th>
+                                    <th>Status</th>
+                                    <th>Priority</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for visit in queue %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>{{ visit.patient.full_name }}</td>
+                                        <td><span class="badge bg-info text-dark">{{ visit.get_status_display }}</span></td>
+                                        <td>
+                                            {% if visit.is_emergency %}
+                                                <span class="badge bg-danger">Emergency</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Normal</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">
+                                            <a href="{% url 'patient_emr' visit.patient.id %}" class="btn btn-sm btn-primary">Open EMR</a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-light border mb-0">No patients are waiting in your queue.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 
-<div class="col-lg-5">
-<div class="card shadow-sm border-0">
-<div class="card-body">
-<div class="d-flex justify-content-between align-items-center mb-3">
-<h5 class="fw-bold mb-0">Today's Appointments</h5>
-<span class="badge bg-secondary">{{ today_appointments|length }} today</span>
-</div>
+    <div class="col-lg-5">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0">Today's Appointments</h5>
+                    <span class="badge bg-secondary">{{ today_appointments|length }} today</span>
+                </div>
 
-{% if today_appointments %}
-<div class="table-responsive">
-<table class="table table-hover align-middle mb-0">
-<thead class="table-light">
-<tr>
-<th>Time</th>
-<th>Patient</th>
-<th>Status</th>
-</tr>
-</thead>
-<tbody>
-{% for appointment in today_appointments %}
-<tr>
-<td>{{ appointment.time|time:"g:i a" }}</td>
-<td>{{ appointment.patient.full_name }}</td>
-<td>{{ appointment.get_status_display }}</td>
-</tr>
-{% endfor %}
-</tbody>
-</table>
-</div>
-{% else %}
-<div class="alert alert-light border mb-0">No appointments scheduled for today.</div>
-{% endif %}
-</div>
-</div>
-</div>
+                {% if today_appointments %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Patient</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for appointment in today_appointments %}
+                                    <tr>
+                                        <td>{{ appointment.time|time:"g:i a" }}</td>
+                                        <td>{{ appointment.patient.full_name }}</td>
+                                        <td><span class="badge bg-secondary">{{ appointment.get_status_display }}</span></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-light border mb-0">No appointments scheduled for today.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 </div>
 
 {% endblock %}

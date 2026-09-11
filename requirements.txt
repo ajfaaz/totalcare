@@ -10,3 +10,4 @@ python-decouple
 python-dotenv
 dj-database-url
 Faker
+requests

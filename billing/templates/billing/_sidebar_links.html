@@ -1,0 +1,203 @@
+{# Shared sidebar links used in both desktop sidebar and mobile offcanvas. #}
+
+<!-- COMMON -->
+{% if user.role == 'platform_admin' %}
+  <a class="nav-link text-white" href="{% url 'platform_dashboard' %}">
+    <i class="bi bi-speedometer2 me-2"></i> Platform Dashboard
+  </a>
+{% else %}
+  <a class="nav-link text-white" href="{% url 'dashboard' %}">
+    <i class="bi bi-speedometer2 me-2"></i> Dashboard
+  </a>
+{% endif %}
+
+<a class="nav-link text-white" href="{% url 'inbox' %}">
+  <i class="bi bi-envelope me-2"></i> Messages
+  {% if unread_count > 0 %}
+    <span class="badge bg-danger rounded-pill float-end">{{ unread_count }}</span>
+  {% endif %}
+</a>
+
+<a class="nav-link text-white" href="{% url 'user_profile' %}">
+  <i class="bi bi-person-circle me-2"></i> My Profile
+</a>
+
+<!-- PLATFORM ADMIN -->
+{% if user.role == "platform_admin" %}
+  <hr class="border-secondary opacity-50">
+  <div class="px-3 mb-2 text-uppercase text-white-50 fw-bold" style="font-size: 11px; letter-spacing: 1px;">Platform Management</div>
+  <a class="nav-link text-white" href="{% url 'platform_dashboard' %}">
+    <i class="bi bi-buildings me-2"></i> Hospitals Directory
+  </a>
+  <a class="nav-link text-white" href="{% url 'create_hospital' %}">
+    <i class="bi bi-plus-square me-2"></i> Register New Hospital
+  </a>
+  <a class="nav-link text-white" href="{% url 'payment_page' %}">
+    <i class="bi bi-credit-card me-2"></i> Subscription Payments
+  </a>
+{% endif %}
+
+<!-- HOSPITAL ADMIN -->
+{% if user.role == "admin" %}
+  <hr class="border-secondary opacity-50">
+  <div class="px-3 mb-2 text-uppercase text-white-50 fw-bold" style="font-size: 11px; letter-spacing: 1px;">Hospital Admin</div>
+  <a class="nav-link text-white" href="{% url 'patient_list' %}">
+    <i class="bi bi-people me-2"></i> Patients Directory
+  </a>
+  <a class="nav-link text-white" href="{% url 'appointment_list' %}">
+    <i class="bi bi-calendar-event me-2"></i> Appointments
+  </a>
+  <a class="nav-link text-white" href="{% url 'bill_list' %}">
+    <i class="bi bi-receipt me-2"></i> Bills & Billing
+  </a>
+  <a class="nav-link text-white" href="{% url 'income_report' %}">
+    <i class="bi bi-graph-up me-2"></i> Income Report
+  </a>
+  <a class="nav-link text-white" href="{% url 'admin_alert_dashboard' %}">
+    <i class="bi bi-exclamation-triangle me-2"></i> Vital Alerts
+  </a>
+  <a class="nav-link text-white" href="{% url 'doctor_sla_dashboard' %}">
+    <i class="bi bi-stopwatch me-2"></i> Doctor SLA Dashboard
+  </a>
+  <a class="nav-link text-white" href="{% url 'doctor_sla_leaderboard' %}">
+    <i class="bi bi-trophy me-2"></i> SLA Leaderboard
+  </a>
+  <a class="nav-link text-white" href="{% url 'doctor_sla_trend' %}">
+    <i class="bi bi-activity me-2"></i> SLA Performance Trends
+  </a>
+  <a class="nav-link text-white" href="{% url 'hospital_sla_settings' %}">
+    <i class="bi bi-gear me-2"></i> SLA Settings
+  </a>
+  <a class="nav-link text-white" href="{% url 'audit_logs' %}">
+    <i class="bi bi-shield-check me-2"></i> Audit Logs
+  </a>
+{% endif %}
+
+<!-- RECEPTIONIST -->
+{% if user.role == "receptionist" %}
+  <hr class="border-secondary opacity-50">
+  <div class="px-3 mb-2 text-uppercase text-white-50 fw-bold" style="font-size: 11px; letter-spacing: 1px;">Reception Desk</div>
+  <a class="nav-link text-white" href="{% url 'patient_list' %}">
+    <i class="bi bi-people me-2"></i> Patient Directory
+  </a>
+  <a class="nav-link text-white" href="{% url 'create_patient' %}">
+    <i class="bi bi-person-plus me-2"></i> Register Patient
+  </a>
+  <a class="nav-link text-white" href="{% url 'appointment_list' %}">
+    <i class="bi bi-calendar-check me-2"></i> Appointments
+  </a>
+  <a class="nav-link text-white" href="{% url 'create_appointment' %}">
+    <i class="bi bi-calendar-plus me-2"></i> Book Appointment
+  </a>
+  <a class="nav-link text-white" href="{% url 'bill_list' %}">
+    <i class="bi bi-receipt me-2"></i> Front Desk Bills
+  </a>
+{% endif %}
+
+<!-- DOCTOR -->
+{% if user.role == "doctor" %}
+  <hr class="border-secondary opacity-50">
+  <div class="px-3 mb-2 text-uppercase text-white-50 fw-bold" style="font-size: 11px; letter-spacing: 1px;">Medical Practice</div>
+  <a class="nav-link text-white" href="{% url 'patient_list' %}">
+    <i class="bi bi-people me-2"></i> Patients
+  </a>
+  <a class="nav-link text-white" href="{% url 'appointment_list' %}">
+    <i class="bi bi-calendar-event me-2"></i> Appointments
+  </a>
+  <a class="nav-link text-white" href="{% url 'doctor_prescriptions' %}">
+    <i class="bi bi-journal-medical me-2"></i> My Prescriptions
+  </a>
+  <a class="nav-link text-white" href="{% url 'doctor_alert_dashboard' %}">
+    <i class="bi bi-exclamation-triangle me-2"></i> Vital Alerts
+  </a>
+  <a class="nav-link text-white" href="{% url 'doctor_sla_self' %}">
+    <i class="bi bi-award me-2"></i> My SLA Performance
+  </a>
+{% endif %}
+
+<!-- NURSE -->
+{% if user.role == "nurse" %}
+  <hr class="border-secondary opacity-50">
+  <div class="px-3 mb-2 text-uppercase text-white-50 fw-bold" style="font-size: 11px; letter-spacing: 1px;">Nursing Care</div>
+  <a class="nav-link text-white" href="{% url 'dashboard' %}">
+    <i class="bi bi-heart-pulse me-2"></i> Active Patient Visits
+  </a>
+  <a class="nav-link text-white" href="{% url 'patient_list' %}">
+    <i class="bi bi-people me-2"></i> Patients Directory
+  </a>
+  <a class="nav-link text-white" href="{% url 'appointment_list' %}">
+    <i class="bi bi-calendar-event me-2"></i> Appointments
+  </a>
+{% endif %}
+
+<!-- PHARMACIST -->
+{% if user.role == "pharmacist" %}
+  <hr class="border-secondary opacity-50">
+  <div class="px-3 mb-2 text-uppercase text-white-50 fw-bold" style="font-size: 11px; letter-spacing: 1px;">Pharmacy Management</div>
+  <a class="nav-link text-white" href="{% url 'pharmacist_dashboard' %}">
+    <i class="bi bi-speedometer me-2"></i> Pharmacist Dashboard
+  </a>
+  <a class="nav-link text-white" href="{% url 'pharmacist_prescriptions' %}">
+    <i class="bi bi-prescription me-2"></i> Pending Prescriptions
+  </a>
+  <a class="nav-link text-white" href="{% url 'medicine_list' %}">
+    <i class="bi bi-capsule me-2"></i> Medicine Inventory
+  </a>
+  <a class="nav-link text-white" href="{% url 'add_medicine' %}">
+    <i class="bi bi-plus-circle me-2"></i> Add Medicine
+  </a>
+  <a class="nav-link text-white" href="{% url 'category_list' %}">
+    <i class="bi bi-tags me-2"></i> Medicine Categories
+  </a>
+  <a class="nav-link text-white" href="{% url 'dispense_history' %}">
+    <i class="bi bi-clock-history me-2"></i> Dispense History
+  </a>
+  <a class="nav-link text-white" href="{% url 'bill_list' %}">
+    <i class="bi bi-receipt me-2"></i> Pharmacy Bills
+  </a>
+{% endif %}
+
+<!-- LAB TECHNICIAN -->
+{% if user.role == "lab" %}
+  <hr class="border-secondary opacity-50">
+  <div class="px-3 mb-2 text-uppercase text-white-50 fw-bold" style="font-size: 11px; letter-spacing: 1px;">Laboratory</div>
+  <a class="nav-link text-white" href="{% url 'lab_dashboard' %}">
+    <i class="bi bi-eyedropper me-2"></i> Pending Lab Tests
+  </a>
+  <a class="nav-link text-white" href="{% url 'patient_list' %}">
+    <i class="bi bi-people me-2"></i> Patient Directory
+  </a>
+{% endif %}
+
+<!-- RADIOLOGIST -->
+{% if user.role == "radiologist" %}
+  <hr class="border-secondary opacity-50">
+  <div class="px-3 mb-2 text-uppercase text-white-50 fw-bold" style="font-size: 11px; letter-spacing: 1px;">Radiology Imaging</div>
+  <a class="nav-link text-white" href="{% url 'radiology_dashboard' %}">
+    <i class="bi bi-camera me-2"></i> Radiology Scans
+  </a>
+  <a class="nav-link text-white" href="{% url 'patient_list' %}">
+    <i class="bi bi-people me-2"></i> Patient Directory
+  </a>
+{% endif %}
+
+<!-- ACCOUNTANT -->
+{% if user.role == "accountant" %}
+  <hr class="border-secondary opacity-50">
+  <div class="px-3 mb-2 text-uppercase text-white-50 fw-bold" style="font-size: 11px; letter-spacing: 1px;">Finance & Accounts</div>
+  <a class="nav-link text-white" href="{% url 'accountant_dashboard' %}">
+    <i class="bi bi-speedometer2 me-2"></i> Accountant Dashboard
+  </a>
+  <a class="nav-link text-white" href="{% url 'bill_list' %}">
+    <i class="bi bi-receipt-cutoff me-2"></i> All Bills & Invoices
+  </a>
+  <a class="nav-link text-white" href="{% url 'nhis_claims_dashboard' %}">
+    <i class="bi bi-file-earmark-medical me-2"></i> NHIS / KSCHMA Claims
+  </a>
+  <a class="nav-link text-white" href="{% url 'income_report' %}">
+    <i class="bi bi-graph-up-arrow me-2"></i> Income Report
+  </a>
+  <a class="nav-link text-white" href="{% url 'patient_list' %}">
+    <i class="bi bi-people me-2"></i> Patient Directory
+  </a>
+{% endif %}
