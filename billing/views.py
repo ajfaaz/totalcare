@@ -3076,54 +3076,26 @@ def pharmacist_dispense_prescription(request, prescription_id):
         lines = prescription.medicines.splitlines()  # expected: "Medicine Name x 2"
         errors = []
 
-        def parse_line(raw_line: str):
-            raw_line = (raw_line or "").strip()
-            if not raw_line:
-                return None
-            m = re.match(r"^(?P<name>.+?)\s*[xX]\s*(?P<qty>\d+)\s*$", raw_line)
-            if not m:
-                # Backwards compatibility: old prescriptions may store just a medicine name.
-                return raw_line, 1
-            return m.group("name").strip(), int(m.group("qty"))
-
-            med_name = line.split("x")[0].strip()
-            try:
-                qty_needed = int(line.split("x")[1].strip())
-            except ValueError:
+        for line in lines:
+            line = line.strip()
+            if not line:
                 continue
 
-                med_name, qty_needed = parsed
-                if qty_needed <= 0:
-                    errors.append(f"Invalid quantity for {med_name}.")
-                    continue
-
+            if "x" in line.lower():
+                parts = re.split(r"[xX]", line, maxsplit=1)
+                med_name = parts[0].strip()
                 try:
-                    med = Medicine.objects.select_for_update().get(
-                        hospital=request.user.hospital,
-                        name__iexact=med_name,
-                    )
-                except Medicine.DoesNotExist:
-                    errors.append(f"{med_name} is not found in inventory.")
-                    continue
+                    qty_needed = int(parts[1].strip())
+                except ValueError:
+                    qty_needed = 1
+            else:
+                med_name = line
+                qty_needed = 1
 
-                updated = Medicine.objects.filter(
-                    pk=med.pk,
-                    quantity__gte=qty_needed,
-                ).update(quantity=F("quantity") - qty_needed)
-
-                if updated != 1:
-                    med.refresh_from_db(fields=["quantity"])
-                    errors.append(
-                        f"Not enough stock for: {med.name} (needed {qty_needed}, available {med.quantity})"
-                    )
-                    continue
-
-                StockLog.objects.create(
-                    medicine=med,
-                    user=request.user,
-                    action="out",
-                    quantity=qty_needed,
-                    notes=f"Dispensed via prescription #{prescription.id}",
+            try:
+                med = Medicine.objects.get(
+                    hospital=request.user.hospital,
+                    name__iexact=med_name
                 )
             except Medicine.DoesNotExist:
                 errors.append(f"{med_name} is not found in inventory.")
@@ -3167,6 +3139,7 @@ def pharmacist_dispense_prescription(request, prescription_id):
     return render(request, "billing/pharmacist_dispense_confirm.html", {
         "prescription": prescription
     })
+
 
 dispense_prescription = pharmacist_dispense_prescription
 
