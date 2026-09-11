@@ -1,7 +1,9 @@
 from django import forms
+from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import UserCreationForm, SetPasswordForm
 from django.contrib.auth import get_user_model
 from django.forms.widgets import DateInput, TimeInput, Textarea, Select
+import re
 from .models import (
     Patient,
     PatientCoverage,
@@ -113,9 +115,18 @@ class CustomUserCreationForm(UserCreationForm):
         )
 
     def __init__(self, *args, **kwargs):
+        self.request_user = kwargs.pop("request_user", None)
         super().__init__(*args, **kwargs)
         self.fields["role"].help_text = "Choose the staff member's access level."
         self.fields["specialty"].help_text = "Optional. Use for doctors or other specialist roles."
+
+        # Prevent hospital admins from creating platform admins (UI-level).
+        if self.request_user is not None and getattr(self.request_user, "role", None) != "platform_admin":
+            self.fields["role"].choices = [
+                (value, label)
+                for (value, label) in self.fields["role"].choices
+                if value != "platform_admin"
+            ]
 
         for field_name in ("username", "email", "specialty", "password1", "password2"):
             self.fields[field_name].widget.attrs.update({"class": "form-control"})
@@ -140,6 +151,14 @@ class CustomUserCreationForm(UserCreationForm):
             user.save()
         return user
 
+    def clean_role(self):
+        role = self.cleaned_data.get("role")
+        # Server-side protection (handles request tampering).
+        if self.request_user is not None and getattr(self.request_user, "role", None) != "platform_admin":
+            if role == "platform_admin":
+                raise ValidationError("You are not allowed to create a platform admin user.")
+        return role
+
 
 class StaffUserUpdateForm(forms.ModelForm):
     class Meta:
@@ -157,9 +176,26 @@ class StaffUserUpdateForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        self.request_user = kwargs.pop("request_user", None)
         super().__init__(*args, **kwargs)
         self.fields["role"].help_text = "Update the staff member's access level."
         self.fields["specialty"].help_text = "Optional. Useful for doctors and specialist roles."
+
+        # Prevent hospital admins from promoting users to platform admin (UI-level).
+        if self.request_user is not None and getattr(self.request_user, "role", None) != "platform_admin":
+            self.fields["role"].choices = [
+                (value, label)
+                for (value, label) in self.fields["role"].choices
+                if value != "platform_admin"
+            ]
+
+    def clean_role(self):
+        role = self.cleaned_data.get("role")
+        # Server-side protection (handles request tampering).
+        if self.request_user is not None and getattr(self.request_user, "role", None) != "platform_admin":
+            if role == "platform_admin":
+                raise ValidationError("You are not allowed to assign the platform admin role.")
+        return role
 
 
 class UserProfileForm(forms.ModelForm):
@@ -275,7 +311,7 @@ class PrescriptionForm(forms.ModelForm):
                 attrs={
                     "class": "form-control",
                     "rows": 5,
-                    "placeholder": "Enter one medicine per line, e.g.\nParacetamol 500mg - twice daily\nIbuprofen 200mg - after meals"
+                    "placeholder": "Enter one medicine per line as: Medicine Name x Qty\nExample:\nParacetamol 500mg x 2\nIbuprofen 200mg x 1"
                 }
             ),
             "dosage": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g., 1 tablet"}),
@@ -289,9 +325,29 @@ class PrescriptionForm(forms.ModelForm):
             ),
         }
 
+    def clean_medicines(self):
+        medicines = (self.cleaned_data.get("medicines") or "").strip()
+        if not medicines:
+            raise ValidationError("Please add at least one medicine.")
+
+        # Expected each line as "Name x Qty"
+        lines = [ln.strip() for ln in medicines.splitlines() if ln.strip()]
+        bad = []
+        for ln in lines:
+            # "Paracetamol 500mg x 2" (case-insensitive x, flexible spacing)
+            if not re.match(r"^.+?\s*[xX]\s*\d+\s*$", ln):
+                bad.append(ln)
+
+        if bad:
+            raise ValidationError(
+                "Each medicine must be in the format 'Medicine Name x Qty'. "
+                f"Invalid lines: {', '.join(bad[:5])}"
+            )
+        return "\n".join(lines)
+
 # ----------------- Hospital SLA Form -----------------
 
-from .models import Hospital, SLAPolicy
+from .models import Hospital, SLAPolicy, Service
 
 class HospitalSLAForm(forms.ModelForm):
     class Meta:
@@ -330,3 +386,52 @@ class SLAPolicyForm(forms.ModelForm):
             "max_escalation_level",
             "active",
         ]
+
+
+class ServiceForm(forms.ModelForm):
+    class Meta:
+        model = Service
+        fields = ["name", "description", "price"]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. Consultation"}),
+            "description": forms.Textarea(attrs={"class": "form-control", "rows": 2, "placeholder": "Optional"}),
+            "price": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "min": "0"}),
+        }
+
+    def clean_name(self):
+        name = (self.cleaned_data.get("name") or "").strip()
+        if not name:
+            raise ValidationError("Service name is required.")
+        return name
+
+
+class DemoSignupForm(forms.Form):
+    hospital_name = forms.CharField(
+        max_length=100,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Hospital / Clinic name"}),
+    )
+    full_name = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Full name"}),
+    )
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={"class": "form-control", "placeholder": "Email address"}),
+    )
+    username = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Username"}),
+    )
+    password1 = forms.CharField(
+        widget=forms.PasswordInput(attrs={"class": "form-control", "placeholder": "Password"}),
+    )
+    password2 = forms.CharField(
+        widget=forms.PasswordInput(attrs={"class": "form-control", "placeholder": "Confirm password"}),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        p1 = cleaned.get("password1")
+        p2 = cleaned.get("password2")
+        if p1 and p2 and p1 != p2:
+            self.add_error("password2", "Passwords do not match.")
+        return cleaned

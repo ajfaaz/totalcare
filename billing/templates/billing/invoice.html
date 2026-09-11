@@ -47,9 +47,9 @@
 
 
       <h5 class="mt-4">Payment Summary</h5>
-      <p><strong>Total Amount:</strong> ${{ bill.total_amount }}</p>
-      <p><strong>Paid:</strong> ${{ paid }}</p>
-      <p><strong>Due:</strong> ${{ due }}</p>
+      <p><strong>Total Amount:</strong> ₦{{ bill.total_amount }}</p>
+      <p><strong>Paid:</strong> ₦{{ paid }}</p>
+      <p><strong>Due:</strong> ₦{{ due }}</p>
 
       <a href="{% url 'record_payment' bill.id %}" class="btn btn-success mt-3">Record Payment</a>
       <a href="{% url 'download_invoice_pdf' bill.id %}" class="btn btn-outline-primary mt-3">Download PDF</a>

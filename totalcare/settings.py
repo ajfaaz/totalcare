@@ -27,7 +27,8 @@ def env_bool(name, default=False):
 # SECURITY SETTINGS
 # =====================
 SECRET_KEY = config('SECRET_KEY', default='your-dev-secret-key')
-DEBUG = env_bool('DEBUG', default=True)
+# Default to False for safety in production. Enable locally via `.env` (DEBUG=True).
+DEBUG = env_bool('DEBUG', default=False)
 
 DEFAULT_ALLOWED_HOSTS = [
     '127.0.0.1',
@@ -117,6 +118,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'billing.context_processors.unread_messages',
+                'billing.context_processors.subscription_status',
             ],
         },
     },

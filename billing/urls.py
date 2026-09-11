@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     # Home & Dashboard
     path('', views.home, name='home'),
+    path('demo/', views.demo_signup, name='demo_signup'),
     path('dashboard/', views.dashboard, name='dashboard'),
     path('redirect-by-role/', views.redirect_by_role, name='redirect_by_role'),
     path('profile/', views.user_profile, name='user_profile'),
@@ -14,6 +15,9 @@ urlpatterns = [
     path('admin-dashboard/users/<int:user_id>/toggle-active/', views.toggle_user_active, name='toggle_user_active'),
     path('admin-dashboard/users/<int:user_id>/edit/', views.edit_staff_user, name='edit_staff_user'),
     path('admin-dashboard/users/<int:user_id>/reset-password/', views.reset_staff_password, name='reset_staff_password'),
+    path('admin-dashboard/services/', views.manage_services, name='manage_services'),
+    path('admin-dashboard/services/<int:service_id>/edit/', views.edit_service, name='edit_service'),
+    path('admin-dashboard/services/<int:service_id>/delete/', views.delete_service, name='delete_service'),
     path('doctor-dashboard/', views.doctor_dashboard, name='doctor_dashboard'),
     path('receptionist-dashboard/', views.receptionist_dashboard, name='receptionist_dashboard'),
     path('accountant-dashboard/', views.accountant_dashboard, name='accountant_dashboard'),
@@ -191,7 +195,7 @@ urlpatterns = [
     ),
     path(
         "pharmacist/prescriptions/<int:prescription_id>/dispense/",
-        views.dispense_prescription,
+        views.pharmacist_dispense_prescription,
         name="pharmacist_dispense_prescription"
     ),
     path(

@@ -266,6 +266,17 @@ def build_accountant_dashboard_context(user):
     # 2️⃣ Secondary Focus: Government & HMO Claims (NHIS & KSCHMA)
     nhis = Payer.objects.filter(code="NHIS").first()
     kschma = Payer.objects.filter(code="KSCHMA").first()
+    today = timezone.localdate()
+    month_start = today.replace(day=1)
+
+    payments = Payment.objects.filter(hospital=hospital)
+    daily_revenue = payments.filter(paid_on__date=today).aggregate(t=Sum("amount_paid"))["t"] or 0
+    mtd_revenue = payments.filter(paid_on__date__gte=month_start, paid_on__date__lte=today).aggregate(t=Sum("amount_paid"))["t"] or 0
+    daily_by_method = {
+        "cash": payments.filter(paid_on__date=today, payment_mode="cash").aggregate(t=Sum("amount_paid"))["t"] or 0,
+        "card": payments.filter(paid_on__date=today, payment_mode="card").aggregate(t=Sum("amount_paid"))["t"] or 0,
+        "transfer": payments.filter(paid_on__date=today, payment_mode="transfer").aggregate(t=Sum("amount_paid"))["t"] or 0,
+    }
 
     government_bills = all_bills.filter(
         third_party__payer_type__in=["federal", "state"],
@@ -274,12 +285,38 @@ def build_accountant_dashboard_context(user):
     nhis_bills = government_bills.filter(patient__patientcoverage__payer=nhis).order_by("-created_at") if nhis else Bill.objects.none()
     kschma_bills = government_bills.filter(patient__patientcoverage__payer=kschma).order_by("-created_at") if kschma else Bill.objects.none()
 
+    # HMO / Corporate receivables are represented as non-government third party payers.
+    sponsor_bills = Bill.objects.filter(
+        hospital=hospital,
+        third_party__payer_type__in=["private", "hospital"],
+    ).select_related("patient", "third_party").order_by("-created_at")
+
     def bill_totals(qs):
+        total = qs.aggregate(t=Sum("third_party_payable"))["t"] or 0
+        paid = qs.filter(is_fully_paid=True).aggregate(p=Sum("third_party_payable"))["p"] or 0
+        unpaid = qs.filter(is_fully_paid=False).aggregate(u=Sum("third_party_payable"))["u"] or 0
         return {
-            "total": qs.aggregate(t=Sum("third_party_payable"))["t"] or 0,
-            "paid": qs.filter(is_fully_paid=True).aggregate(p=Sum("third_party_payable"))["p"] or 0,
-            "unpaid": qs.filter(is_fully_paid=False).aggregate(u=Sum("third_party_payable"))["u"] or 0,
+            "total": total,
+            "paid": paid,
+            "unpaid": unpaid,
         }
+
+    # Quick financial statement (lightweight): AR patient + AR third-party.
+    patient_ar_qs = (
+        Bill.objects.filter(hospital=hospital)
+        .annotate(paid_sum=Coalesce(Sum("payment__amount_paid"), 0))
+        .annotate(patient_due=F("patient_payable") - F("paid_sum"))
+        .filter(patient_due__gt=0)
+    )
+    patient_receivables = patient_ar_qs.aggregate(t=Sum("patient_due"))["t"] or 0
+
+    third_party_receivables = Bill.objects.filter(
+        hospital=hospital,
+        third_party__isnull=False,
+        is_fully_paid=False,
+    ).aggregate(t=Sum("third_party_payable"))["t"] or 0
+
+    sponsor_receivables = sponsor_bills.filter(is_fully_paid=False).aggregate(t=Sum("third_party_payable"))["t"] or 0
 
     return {
         # Primary Self-Sponsor Metrics
@@ -532,6 +569,33 @@ def dashboard(request):
             "pending_reports": pending_scans.count(),
             "completed_today": completed_today
         })
+
+    # ==============================
+    # PHARMACIST DASHBOARD
+    # ==============================
+    if user.role == "pharmacist":
+        today = timezone.localdate()
+        prescriptions = (
+            Prescription.objects.filter(status="issued", hospital=hospital)
+            .select_related("visit__patient", "doctor")
+            .order_by("-issued_at")
+        )
+
+        today_dispensed = Prescription.objects.filter(
+            status="dispensed",
+            hospital=hospital,
+            dispensed_at__date=today,
+        ).count()
+
+        return render(
+            request,
+            "billing/pharmacist_dashboard.html",
+            {
+                **base_context,
+                "prescriptions": prescriptions,
+                "today_dispensed": today_dispensed,
+            },
+        )
     
     # ==============================
     # RECEPTIONIST DASHBOARD
@@ -585,7 +649,34 @@ def dashboard(request):
     # ==============================
     if user.role == "doctor":
         query = request.GET.get("q")
+        today = timezone.localdate()
+        now_local = timezone.localtime()
+        now_time = now_local.time()
         last_30_days = timezone.now() - timedelta(days=30)
+
+        # Auto-refresh daily: close out stale visits and past appointments for this doctor.
+        # This prevents yesterday's queue from lingering forever.
+        PatientVisit.objects.filter(
+            hospital=hospital,
+            assigned_doctor=user,
+            is_active=True,
+            status__in=["pending", "under_diagnosis"],
+        ).exclude(created_at__date=today).update(is_active=False, status="completed")
+
+        Appointment.objects.filter(
+            hospital=hospital,
+            doctor=user,
+            status="scheduled",
+            date__lt=today,
+        ).update(status="cancelled")
+
+        Appointment.objects.filter(
+            hospital=hospital,
+            doctor=user,
+            status="scheduled",
+            date=today,
+            time__lt=now_time,
+        ).update(status="cancelled")
 
         patients = Patient.objects.filter(
             hospital=hospital,
@@ -602,12 +693,15 @@ def dashboard(request):
         active_visits = PatientVisit.objects.filter(
             hospital=hospital,
             assigned_doctor=user,
+            is_active=True,
         ).exclude(status="completed").select_related("patient")
 
         queue = PatientVisit.objects.filter(
             hospital=hospital,
             assigned_doctor=user,
+            is_active=True,
             status__in=["pending", "under_diagnosis"],
+            created_at__date=today,
         ).select_related("patient").order_by("-is_emergency", "created_at")
 
         doctor_prescriptions = Prescription.objects.filter(hospital=hospital, doctor=user)
@@ -617,7 +711,9 @@ def dashboard(request):
         today_appointments = Appointment.objects.filter(
             hospital=hospital,
             doctor=user,
-            date=timezone.localdate(),
+            status="scheduled",
+            date=today,
+            time__gte=now_time,
         ).select_related("patient")
 
         return render(request, "billing/dashboard_doctor.html", {
@@ -668,6 +764,80 @@ def dashboard(request):
 
 def home(request):
     return render(request, "home.html")
+
+
+def _unique_hospital_slug(base_name: str):
+    """Generate a unique slug for Hospital without prompting the user."""
+    base = slugify(base_name)[:45] or "hospital"
+    slug = base
+    i = 2
+    while Hospital.objects.filter(slug=slug).exists():
+        suffix = f"-{i}"
+        slug = f"{base[:45-len(suffix)]}{suffix}"
+        i += 1
+    return slug
+
+
+def demo_signup(request):
+    """Public: create a 30-day demo hospital + admin user and log them in."""
+    if request.user.is_authenticated:
+        return redirect("dashboard")
+
+    if request.method == "POST":
+        form = DemoSignupForm(request.POST)
+        if form.is_valid():
+            hospital_name = form.cleaned_data["hospital_name"].strip()
+            full_name = form.cleaned_data["full_name"].strip()
+            email = form.cleaned_data["email"].strip().lower()
+            username = form.cleaned_data["username"].strip()
+            password = form.cleaned_data["password1"]
+
+            if CustomUser.objects.filter(username__iexact=username).exists():
+                form.add_error("username", "This username is already taken.")
+                return render(request, "billing/demo_signup.html", {"form": form})
+            if CustomUser.objects.filter(email__iexact=email).exists():
+                form.add_error("email", "An account with this email already exists.")
+                return render(request, "billing/demo_signup.html", {"form": form})
+
+            # Create hospital + subscription trial
+            from datetime import date, timedelta
+            hospital = Hospital.objects.create(
+                name=hospital_name,
+                slug=_unique_hospital_slug(hospital_name),
+                owner_email=email,
+                is_active=True,
+            )
+            Subscription.objects.create(
+                hospital=hospital,
+                plan="standard",
+                start_date=date.today(),
+                end_date=date.today() + timedelta(days=30),
+                is_active=True,
+                is_trial=True,
+            )
+
+            # Create admin user for that hospital
+            user = CustomUser.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                role="admin",
+                hospital=hospital,
+            )
+            if full_name:
+                parts = full_name.split(None, 1)
+                user.first_name = parts[0]
+                if len(parts) > 1:
+                    user.last_name = parts[1]
+                user.save(update_fields=["first_name", "last_name"])
+
+            login(request, user)
+            messages.success(request, "Demo activated. Your 30-day trial has started.")
+            return redirect("dashboard")
+    else:
+        form = DemoSignupForm()
+
+    return render(request, "billing/demo_signup.html", {"form": form})
 
 
 @login_required
@@ -2480,7 +2650,7 @@ def register(request):
     hospital = request.user.hospital
 
     if request.method == "POST":
-        form = CustomUserCreationForm(request.POST)
+        form = CustomUserCreationForm(request.POST, request_user=request.user)
         if form.is_valid():
             new_user = form.save(hospital=hospital)
             log_action(
@@ -2493,7 +2663,7 @@ def register(request):
             messages.success(request, f"User '{new_user.username}' created successfully.")
             return redirect("register")
     else:
-        form = CustomUserCreationForm()
+        form = CustomUserCreationForm(request_user=request.user)
 
     staff_users = CustomUser.objects.filter(hospital=hospital).order_by("role", "username")
     return render(
@@ -2520,7 +2690,7 @@ def admin_dashboard(request):
     hospital = request.user.hospital
 
     if request.method == "POST":
-        form = CustomUserCreationForm(request.POST)
+        form = CustomUserCreationForm(request.POST, request_user=request.user)
         if form.is_valid():
             new_user = form.save(hospital=hospital)
             log_action(
@@ -2533,7 +2703,7 @@ def admin_dashboard(request):
             messages.success(request, f"User '{new_user.username}' created successfully.")
             return redirect("admin_dashboard")
     else:
-        form = CustomUserCreationForm()
+        form = CustomUserCreationForm(request_user=request.user)
 
     return render(request, "billing/dashboard_admin.html", build_admin_dashboard_context(request, form=form))
 
@@ -2576,8 +2746,13 @@ def edit_staff_user(request, user_id):
 
     staff_user = hospital_scoped_or_404(CustomUser, request.user, id=user_id)
 
+    # Extra safety: hospital admins must never manage platform admins, even if someone forces it into the same hospital.
+    if getattr(staff_user, "role", None) == "platform_admin" and request.user.role != "platform_admin":
+        messages.error(request, "Unauthorized access.")
+        return redirect("admin_dashboard")
+
     if request.method == "POST":
-        profile_form = StaffUserUpdateForm(request.POST, instance=staff_user)
+        profile_form = StaffUserUpdateForm(request.POST, instance=staff_user, request_user=request.user)
         password_form = StaffPasswordResetForm(staff_user)
 
         if profile_form.is_valid():
@@ -2618,7 +2793,7 @@ def edit_staff_user(request, user_id):
                 messages.success(request, f"User '{updated_user.username}' updated successfully.")
                 return redirect("edit_staff_user", user_id=staff_user.id)
     else:
-        profile_form = StaffUserUpdateForm(instance=staff_user)
+        profile_form = StaffUserUpdateForm(instance=staff_user, request_user=request.user)
         password_form = StaffPasswordResetForm(staff_user)
 
     return render(
@@ -2643,7 +2818,7 @@ def reset_staff_password(request, user_id):
     if request.method != "POST":
         return redirect("edit_staff_user", user_id=staff_user.id)
 
-    profile_form = StaffUserUpdateForm(instance=staff_user)
+    profile_form = StaffUserUpdateForm(instance=staff_user, request_user=request.user)
     password_form = StaffPasswordResetForm(staff_user, request.POST)
 
     if password_form.is_valid():
@@ -2667,6 +2842,86 @@ def reset_staff_password(request, user_id):
             "password_form": password_form,
         },
     )
+
+
+@login_required
+def manage_services(request):
+    """Hospital admin can manage billable services and pricing for their hospital."""
+    if request.user.role != "admin":
+        messages.error(request, "Unauthorized access.")
+        return redirect("dashboard")
+
+    hospital = request.user.hospital
+    unread_count = Message.objects.filter(recipient=request.user, is_read=False).count()
+
+    if request.method == "POST":
+        form = ServiceForm(request.POST)
+        if form.is_valid():
+            service = form.save(commit=False)
+            service.hospital = hospital
+            try:
+                service.save()
+            except IntegrityError:
+                messages.error(request, "A service with this name already exists.")
+            else:
+                messages.success(request, f"Service '{service.name}' created.")
+                return redirect("manage_services")
+    else:
+        form = ServiceForm()
+
+    services = Service.objects.filter(hospital=hospital).order_by("name")
+    return render(
+        request,
+        "billing/admin/services_manage.html",
+        {"form": form, "services": services, "unread_count": unread_count},
+    )
+
+
+@login_required
+def edit_service(request, service_id):
+    if request.user.role != "admin":
+        messages.error(request, "Unauthorized access.")
+        return redirect("dashboard")
+
+    service = hospital_scoped_or_404(Service, request.user, id=service_id)
+    unread_count = Message.objects.filter(recipient=request.user, is_read=False).count()
+
+    if request.method == "POST":
+        form = ServiceForm(request.POST, instance=service)
+        if form.is_valid():
+            updated = form.save(commit=False)
+            updated.hospital = request.user.hospital
+            try:
+                updated.save()
+            except IntegrityError:
+                messages.error(request, "A service with this name already exists.")
+            else:
+                messages.success(request, "Service updated.")
+                return redirect("manage_services")
+    else:
+        form = ServiceForm(instance=service)
+
+    return render(
+        request,
+        "billing/admin/service_edit.html",
+        {"form": form, "service": service, "unread_count": unread_count},
+    )
+
+
+@login_required
+def delete_service(request, service_id):
+    if request.user.role != "admin":
+        messages.error(request, "Unauthorized access.")
+        return redirect("dashboard")
+
+    if request.method != "POST":
+        return redirect("manage_services")
+
+    service = hospital_scoped_or_404(Service, request.user, id=service_id)
+    name = service.name
+    service.delete()
+    messages.success(request, f"Service '{name}' deleted.")
+    return redirect("manage_services")
 
 @login_required
 def doctor_dashboard(request):
@@ -2700,23 +2955,26 @@ def lab_dashboard(request):
 @login_required
 def pharmacist_dashboard(request):
     hospital = request.user.hospital
-    prescriptions = Prescription.objects.filter(status='issued', hospital=hospital).order_by('-issued_at')
+    today = timezone.localdate()
+    prescriptions = (
+        Prescription.objects.filter(status="issued", hospital=hospital)
+        .select_related("visit__patient", "doctor")
+        .order_by("-issued_at")
+    )
 
-    # Daily Dispense Count
-    today = timezone.now().date()
-    daily_dispensed_count = Prescription.objects.filter(
-        status='dispensed',
+    today_dispensed = Prescription.objects.filter(
+        status="dispensed",
         hospital=hospital,
-        dispensed_at__date=today
+        dispensed_at__date=today,
     ).count()
 
-    print("Pharmacist Dashboard → Found prescriptions:", prescriptions.count())  # debug log
-    for p in prescriptions:
-        print(f"→ {p.id}: {p.medicines} ({p.status})")
+    # Keep parity with the main /dashboard/ context so templates are consistent.
+    unread_count = Message.objects.filter(recipient=request.user, is_read=False).count()
 
     context = {
         "prescriptions": prescriptions,
-        "daily_dispensed_count": daily_dispensed_count,
+        "today_dispensed": today_dispensed,
+        "unread_count": unread_count,
     }
     return render(request, "billing/pharmacist_dashboard.html", context)
 
@@ -2815,12 +3073,18 @@ def pharmacist_dispense_prescription(request, prescription_id):
         # -------------------------------
         # 1️⃣ Deduct medicine from inventory
         # -------------------------------
-        lines = prescription.medicines.split("\n")  # medicine1 x 2
+        lines = prescription.medicines.splitlines()  # expected: "Medicine Name x 2"
         errors = []
 
-        for line in lines:
-            if "x" not in line:
-                continue
+        def parse_line(raw_line: str):
+            raw_line = (raw_line or "").strip()
+            if not raw_line:
+                return None
+            m = re.match(r"^(?P<name>.+?)\s*[xX]\s*(?P<qty>\d+)\s*$", raw_line)
+            if not m:
+                # Backwards compatibility: old prescriptions may store just a medicine name.
+                return raw_line, 1
+            return m.group("name").strip(), int(m.group("qty"))
 
             med_name = line.split("x")[0].strip()
             try:
@@ -2828,10 +3092,38 @@ def pharmacist_dispense_prescription(request, prescription_id):
             except ValueError:
                 continue
 
-            try:
-                med = Medicine.objects.get(
-                    hospital=request.user.hospital,
-                    name__iexact=med_name
+                med_name, qty_needed = parsed
+                if qty_needed <= 0:
+                    errors.append(f"Invalid quantity for {med_name}.")
+                    continue
+
+                try:
+                    med = Medicine.objects.select_for_update().get(
+                        hospital=request.user.hospital,
+                        name__iexact=med_name,
+                    )
+                except Medicine.DoesNotExist:
+                    errors.append(f"{med_name} is not found in inventory.")
+                    continue
+
+                updated = Medicine.objects.filter(
+                    pk=med.pk,
+                    quantity__gte=qty_needed,
+                ).update(quantity=F("quantity") - qty_needed)
+
+                if updated != 1:
+                    med.refresh_from_db(fields=["quantity"])
+                    errors.append(
+                        f"Not enough stock for: {med.name} (needed {qty_needed}, available {med.quantity})"
+                    )
+                    continue
+
+                StockLog.objects.create(
+                    medicine=med,
+                    user=request.user,
+                    action="out",
+                    quantity=qty_needed,
+                    notes=f"Dispensed via prescription #{prescription.id}",
                 )
             except Medicine.DoesNotExist:
                 errors.append(f"{med_name} is not found in inventory.")
@@ -3094,7 +3386,7 @@ def stock_in(request, pk):
 
         StockLog.objects.create(
             medicine=med,
-            action="IN",
+            action="in",
             quantity=qty,
             user=request.user
         )
@@ -3123,7 +3415,7 @@ def stock_out(request, pk):
 
         StockLog.objects.create(
             medicine=med,
-            action="OUT",
+            action="out",
             quantity=qty,
             user=request.user
         )
@@ -3154,8 +3446,10 @@ def stock_logs_view(request):
     if med:
         logs = logs.filter(medicine__id=med)
 
-    if action in ["IN", "OUT"]:
-        logs = logs.filter(action=action)
+    if action in ["IN", "OUT", "in", "out"]:
+        # Support legacy uppercase values as well.
+        normalized = action.lower()
+        logs = logs.filter(action__in=[normalized, normalized.upper()])
 
     logs = logs.order_by("-timestamp")
 

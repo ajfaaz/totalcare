@@ -9,9 +9,9 @@
             Patient: {{ bill.patient.full_name }}
         </div>
         <div class="card-body">
-            <h5 class="card-title">Total Amount: ${{ bill.total_amount }}</h5>
+            <h5 class="card-title">Total Amount: ₦{{ bill.total_amount }}</h5>
             
-            <form method="post">
+            <form method="post" action="{% url 'record_payment' bill.id %}" id="recordPaymentForm">
                 {% csrf_token %}
                 <div class="mb-3">
                     <label for="amount" class="form-label">Amount Paid</label>
@@ -27,9 +27,22 @@
                     </select>
                 </div>
                 
-                <button type="submit" class="btn btn-primary">Record Payment</button>
+                <button type="submit" class="btn btn-primary" id="recordPaymentSubmit">Record Payment</button>
                 <a href="{% url 'view_invoice' bill.id %}" class="btn btn-secondary">Cancel</a>
             </form>
+
+            <script>
+              // Prevent double-submit causing duplicate payments
+              (function(){
+                const form = document.getElementById('recordPaymentForm');
+                const btn = document.getElementById('recordPaymentSubmit');
+                if (!form || !btn) return;
+                form.addEventListener('submit', function(){
+                  btn.disabled = true;
+                  btn.textContent = 'Recording...';
+                });
+              })();
+            </script>
         </div>
     </div>
 </div>
